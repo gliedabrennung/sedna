@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gliedabrennung/messenger-core/internal/apperr"
 	"github.com/gliedabrennung/messenger-core/internal/entity"
@@ -35,10 +36,11 @@ func NewAuthUseCase(repo UserRepository, jwtSecret string, jwtTTL time.Duration)
 
 func (a *AuthUseCase) Register(ctx context.Context, username, password string) (*entity.User, error) {
 	username = strings.TrimSpace(username)
-	if len(username) < 3 || len(username) > 24 {
+	runeCount := utf8.RuneCountInString(username)
+	if runeCount < 3 || runeCount > 24 {
 		return nil, apperr.ErrInvalidUsername
 	}
-	if len(password) < 8 {
+	if len(password) < 8 || len(password) > 72 {
 		return nil, apperr.ErrInvalidPassword
 	}
 
@@ -48,8 +50,8 @@ func (a *AuthUseCase) Register(ctx context.Context, username, password string) (
 	}
 
 	user := &entity.User{
-		Username: username,
-		Password: string(hashedPassword),
+		Username:     username,
+		PasswordHash: string(hashedPassword),
 	}
 
 	if err := a.repo.Create(ctx, user); err != nil {
@@ -59,6 +61,7 @@ func (a *AuthUseCase) Register(ctx context.Context, username, password string) (
 		return nil, fmt.Errorf("register: create user: %w", err)
 	}
 
+	user.PasswordHash = ""
 	return user, nil
 }
 
@@ -72,7 +75,7 @@ func (a *AuthUseCase) Login(ctx context.Context, username, password string) (*en
 		return nil, "", fmt.Errorf("login: get user: %w", err)
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, "", apperr.ErrInvalidCredentials
 	}
 
@@ -88,5 +91,6 @@ func (a *AuthUseCase) Login(ctx context.Context, username, password string) (*en
 		return nil, "", fmt.Errorf("login: sign token: %w", err)
 	}
 
+	user.PasswordHash = ""
 	return user, token, nil
 }

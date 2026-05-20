@@ -2,7 +2,6 @@ package http
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -11,34 +10,13 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/cloudwego/hertz/pkg/common/ut"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gliedabrennung/messenger-core/internal/apperr"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/messenger-core/internal/testutil"
 	"github.com/gliedabrennung/messenger-core/internal/usecase"
 )
 
-type mockUserRepo struct {
-	users map[string]*entity.User
-}
-
-func (m *mockUserRepo) Create(ctx context.Context, user *entity.User) error {
-	if _, ok := m.users[user.Username]; ok {
-		return apperr.ErrUserAlreadyExists
-	}
-	m.users[user.Username] = user
-	user.ID = int64(len(m.users))
-	return nil
-}
-
-func (m *mockUserRepo) GetByUsername(ctx context.Context, username string) (*entity.User, error) {
-	user, ok := m.users[username]
-	if !ok {
-		return nil, apperr.ErrUserNotFound
-	}
-	return user, nil
-}
-
 func setupAuthHandler(t *testing.T) (*route.Engine, *AuthHandler) {
-	repo := &mockUserRepo{users: make(map[string]*entity.User)}
+	t.Helper()
+	repo := testutil.NewMockUserRepo()
 	au := usecase.NewAuthUseCase(repo, "secret", time.Hour)
 	handler := NewAuthHandler(au)
 

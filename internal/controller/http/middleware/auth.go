@@ -15,12 +15,15 @@ import (
 func JWTAuth(secret string) app.HandlerFunc {
 	secretBytes := []byte(secret)
 	return func(ctx context.Context, c *app.RequestContext) {
-		header := string(c.GetHeader("Authorization"))
-		if header == "" {
-			header = c.Query("token")
+		var tokenStr string
+
+		if t, ok := extractBearerToken(string(c.GetHeader("Authorization"))); ok {
+			tokenStr = t
+		} else if q := strings.TrimSpace(c.Query("token")); q != "" {
+			tokenStr = q
 		}
-		tokenStr, ok := extractBearerToken(header)
-		if !ok {
+
+		if tokenStr == "" {
 			api.ErrorResponse(c, http.StatusUnauthorized,
 				"UNAUTHORIZED", "missing or malformed authorization header", nil)
 			c.Abort()
@@ -55,13 +58,9 @@ func JWTAuth(secret string) app.HandlerFunc {
 }
 
 func extractBearerToken(header string) (string, bool) {
-	if header == "" {
+	if !strings.HasPrefix(header, "Bearer ") {
 		return "", false
 	}
-	if strings.HasPrefix(header, "Bearer ") {
-		token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
-		return token, token != ""
-	}
-	trimmed := strings.TrimSpace(header)
-	return trimmed, trimmed != ""
+	token := strings.TrimSpace(header[7:])
+	return token, token != ""
 }

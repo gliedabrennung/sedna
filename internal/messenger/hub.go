@@ -1,6 +1,7 @@
 package messenger
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
@@ -34,15 +35,14 @@ func (h *Hub) Stop() {
 	close(h.done)
 }
 
-func (h *Hub) Run() {
+func (h *Hub) Run(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			h.shutdown()
+			return
 		case <-h.done:
-			for id, client := range h.clients {
-				close(client.send)
-				delete(h.clients, id)
-			}
-			hlog.Info("hub: shutdown complete")
+			h.shutdown()
 			return
 		case client := <-h.register:
 			if oldClient, ok := h.clients[client.id]; ok {
@@ -70,4 +70,12 @@ func (h *Hub) Run() {
 			}
 		}
 	}
+}
+
+func (h *Hub) shutdown() {
+	for id, client := range h.clients {
+		close(client.send)
+		delete(h.clients, id)
+	}
+	hlog.Info("hub: shutdown complete")
 }

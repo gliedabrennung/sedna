@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -18,6 +19,7 @@ const (
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
 	maxMessageSize = 1024
+	maxTextLength  = 4096
 )
 
 type Client struct {
@@ -63,6 +65,11 @@ func (c *Client) readPump() {
 		var inc incomingMessage
 		if err := json.Unmarshal(message, &inc); err != nil {
 			hlog.Errorf("ws: invalid json: %v", err)
+			continue
+		}
+
+		inc.Message = strings.TrimSpace(inc.Message)
+		if inc.Message == "" || len(inc.Message) > maxTextLength {
 			continue
 		}
 

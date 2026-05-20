@@ -17,10 +17,10 @@ import (
 
 func TestJWTAuth(t *testing.T) {
 	secret := "testsecret"
-	middleware := JWTAuth(secret)
+	mw := JWTAuth(secret)
 
 	engine := route.NewEngine(config.NewOptions([]config.Option{}))
-	engine.GET("/protected", middleware, func(ctx context.Context, c *app.RequestContext) {
+	engine.GET("/protected", mw, func(ctx context.Context, c *app.RequestContext) {
 		userID, ok := authctx.UserID(c)
 		if !ok {
 			c.Status(http.StatusInternalServerError)
@@ -91,4 +91,47 @@ func TestJWTAuth(t *testing.T) {
 			t.Errorf("expected 401, got %d", w.Code)
 		}
 	})
+
+	t.Run("NoBearerPrefix", func(t *testing.T) {
+		claims := jwt.RegisteredClaims{
+			Subject:   "123",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		tokenStr, _ := token.SignedString([]byte(secret))
+
+		w := ut.PerformRequest(engine, http.MethodGet, "/protected", nil,
+			ut.Header{Key: "Authorization", Value: tokenStr})
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401 for missing Bearer prefix, got %d", w.Code)
+		}
+	})
+}
+
+func TestExtractBearerToken(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+		ok     bool
+	}{
+		{"Valid", "Bearer abc123", "abc123", true},
+		{"Empty", "", "", false},
+		{"NoBearerPrefix", "abc123", "", false},
+		{"BearerOnly", "Bearer ", "", false},
+		{"BearerWithSpaces", "Bearer  abc123 ", "abc123", true},
+		{"LowercaseBearer", "bearer abc123", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := extractBearerToken(tt.header)
+			if ok != tt.ok {
+				t.Errorf("ok = %v, want %v", ok, tt.ok)
+			}
+			if got != tt.want {
+				t.Errorf("token = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

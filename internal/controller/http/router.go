@@ -11,9 +11,9 @@ import (
 )
 
 type Deps struct {
-	Auth      AuthService
-	WsHandler app.HandlerFunc
-	JWTSecret string
+	Auth           AuthService
+	WsHandler      app.HandlerFunc
+	AuthMiddleware app.HandlerFunc
 }
 
 func SetupRouter(h *server.Hertz, deps Deps) {
@@ -32,12 +32,14 @@ func SetupRouter(h *server.Hertz, deps Deps) {
 	})
 
 	authHandler := NewAuthHandler(deps.Auth)
+	authLimiter := middleware.NewRateLimiter(5, 10)
 
 	h.GET("/", ServeHome)
 
 	auth := h.Group("/auth")
+	auth.Use(authLimiter.Handler())
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
 
-	h.GET("/ws", middleware.JWTAuth(deps.JWTSecret), deps.WsHandler)
+	h.GET("/ws", deps.AuthMiddleware, deps.WsHandler)
 }
