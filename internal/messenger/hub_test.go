@@ -10,7 +10,7 @@ import (
 func testHub(t *testing.T) (*Hub, context.CancelFunc) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	h := NewHub()
+	h := NewHub(nil)
 	go h.Run(ctx)
 	return h, cancel
 }
@@ -22,11 +22,7 @@ func testClient(id int64) *Client {
 func registerClient(t *testing.T, h *Hub, c *Client) {
 	t.Helper()
 	c.hub = h
-	select {
-	case h.register <- c:
-	case <-time.After(time.Second):
-		t.Fatal("timeout registering client")
-	}
+	h.Register(c)
 }
 
 func TestHub_Run_DirectMessage(t *testing.T) {
@@ -39,10 +35,8 @@ func TestHub_Run_DirectMessage(t *testing.T) {
 	registerClient(t, h, c2)
 
 	msg := DirectMessage{From: 1, To: 2, Message: "hello"}
-	select {
-	case h.direct <- msg:
-	case <-time.After(time.Second):
-		t.Fatal("timeout sending direct message")
+	if !h.Send(msg) {
+		t.Fatal("Send returned false")
 	}
 
 	select {
@@ -58,16 +52,8 @@ func TestHub_Run_DirectMessage(t *testing.T) {
 		t.Fatal("message not delivered to client")
 	}
 
-	select {
-	case h.unregister <- c1:
-	case <-time.After(time.Second):
-		t.Fatal("timeout unregistering c1")
-	}
-	select {
-	case h.unregister <- c2:
-	case <-time.After(time.Second):
-		t.Fatal("timeout unregistering c2")
-	}
+	h.Unregister(c1)
+	h.Unregister(c2)
 
 	select {
 	case _, ok := <-c1.send:
@@ -104,10 +90,8 @@ func TestHub_DirectMessage_NonExistentClient(t *testing.T) {
 	defer cancel()
 
 	msg := DirectMessage{From: 1, To: 999, Message: "hello"}
-	select {
-	case h.direct <- msg:
-	case <-time.After(time.Second):
-		t.Fatal("timeout sending to non-existent client")
+	if !h.Send(msg) {
+		t.Error("Send should return true for non-existent client")
 	}
 }
 
@@ -117,14 +101,10 @@ func TestHub_Unregister_NotFound(t *testing.T) {
 
 	c := testClient(1)
 	c.hub = h
-	select {
-	case h.unregister <- c:
-	case <-time.After(time.Second):
-		t.Fatal("timeout unregistering unknown client")
-	}
+	h.Unregister(c)
 }
 
-func TestHub_Shutdown(t *testing.T) {
+func TestHub_Shutdown_ViaContext(t *testing.T) {
 	h, cancel := testHub(t)
 
 	c := testClient(1)
@@ -158,5 +138,34 @@ func TestHub_Shutdown_ViaStop(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("client channel not closed after stop")
+	}
+}
+
+func TestHub_Sharding(t *testing.T) {
+	h, cancel := testHub(t)
+	defer cancel()
+
+	clients := make([]*Client, 100)
+	for i := range clients {
+		clients[i] = testClient(int64(i + 1))
+		registerClient(t, h, clients[i])
+	}
+
+	msg := DirectMessage{From: 1, To: 50, Message: "cross-shard"}
+	if !h.Send(msg) {
+		t.Fatal("Send returned false")
+	}
+
+	select {
+	case gotBytes := <-clients[49].send:
+		var gotMsg DirectMessage
+		if err := json.Unmarshal(gotBytes, &gotMsg); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		if gotMsg.Message != "cross-shard" {
+			t.Errorf("got message %q, want %q", gotMsg.Message, "cross-shard")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cross-shard message not delivered")
 	}
 }

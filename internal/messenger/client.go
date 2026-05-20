@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/gliedabrennung/messenger-core/internal/entity"
 	"github.com/gliedabrennung/messenger-core/internal/pkg/api"
 	"github.com/gliedabrennung/messenger-core/internal/pkg/authctx"
 	"github.com/hertz-contrib/websocket"
@@ -18,16 +19,17 @@ const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 1024
-	maxTextLength  = 4096
+	maxMessageSize = 4096
+	maxTextLength  = 4000
 )
 
 type Client struct {
-	hub  *Hub
-	id   int64
-	conn *websocket.Conn
-	send chan []byte
-	done chan struct{}
+	hub      *Hub
+	id       int64
+	conn     *websocket.Conn
+	send     chan []byte
+	done     chan struct{}
+	tokenExp time.Time
 }
 
 type incomingMessage struct {
@@ -35,22 +37,27 @@ type incomingMessage struct {
 	Message string      `json:"message"`
 }
 
+func (c *Client) nextReadDeadline() time.Time {
+	deadline := time.Now().Add(pongWait)
+	if !c.tokenExp.IsZero() && c.tokenExp.Before(deadline) {
+		return c.tokenExp
+	}
+	return deadline
+}
+
 func (c *Client) readPump() {
 	defer func() {
-		select {
-		case c.hub.unregister <- c:
-		case <-c.hub.done:
-		}
+		c.hub.Unregister(c)
 		<-c.done
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
-	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+	if err := c.conn.SetReadDeadline(c.nextReadDeadline()); err != nil {
 		hlog.Errorf("ws: set read deadline: %v", err)
 		return
 	}
 	c.conn.SetPongHandler(func(string) error {
-		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return c.conn.SetReadDeadline(c.nextReadDeadline())
 	})
 
 	for {
@@ -79,14 +86,29 @@ func (c *Client) readPump() {
 			continue
 		}
 
+		if toID == c.id {
+			continue
+		}
+
 		msg := DirectMessage{
 			From:    c.id,
 			To:      toID,
 			Message: inc.Message,
 		}
-		select {
-		case c.hub.direct <- msg:
-		case <-c.hub.done:
+
+		if c.hub.MsgRepo != nil {
+			repoMsg := &entity.Message{
+				ChatID:  entity.MakeChatID(c.id, toID),
+				FromID:  c.id,
+				ToID:    toID,
+				Content: inc.Message,
+			}
+			if err := c.hub.MsgRepo.Save(context.Background(), repoMsg); err != nil {
+				hlog.Errorf("ws: save message: %v", err)
+			}
+		}
+
+		if !c.hub.Send(msg) {
 			return
 		}
 	}
@@ -155,21 +177,19 @@ func ServeWs(hub *Hub, upgrader websocket.HertzUpgrader) app.HandlerFunc {
 			return
 		}
 
+		tokenExp, _ := authctx.TokenExp(c)
+
 		err := upgrader.Upgrade(c, func(conn *websocket.Conn) {
 			client := &Client{
-				hub:  hub,
-				id:   userID,
-				conn: conn,
-				send: make(chan []byte, 256),
-				done: make(chan struct{}),
+				hub:      hub,
+				id:       userID,
+				conn:     conn,
+				send:     make(chan []byte, 256),
+				done:     make(chan struct{}),
+				tokenExp: tokenExp,
 			}
 
-			select {
-			case hub.register <- client:
-			case <-hub.done:
-				conn.Close()
-				return
-			}
+			hub.Register(client)
 
 			go client.writePump()
 			client.readPump()
