@@ -19,9 +19,7 @@ func newTestEngine(t *testing.T) *route.Engine {
 	})
 	engine := route.NewEngine(opts)
 
-	engine.GET("/", func(ctx context.Context, c *app.RequestContext) {
-		c.Status(http.StatusOK)
-	})
+	engine.GET("/", ServeHome)
 	engine.GET("/ws", func(ctx context.Context, c *app.RequestContext) {
 		c.Status(http.StatusBadRequest)
 	})

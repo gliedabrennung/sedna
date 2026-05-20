@@ -16,11 +16,11 @@ import (
 func TestErrorResponse(t *testing.T) {
 	engine := route.NewEngine(config.NewOptions([]config.Option{}))
 	engine.GET("/error", func(ctx context.Context, c *app.RequestContext) {
-		c.Response.Header.Set("X-Request-Id", "test-id")
 		ErrorResponse(c, http.StatusBadRequest, "TEST_CODE", "test message", "test details")
 	})
 
-	w := ut.PerformRequest(engine, http.MethodGet, "/error", nil)
+	w := ut.PerformRequest(engine, http.MethodGet, "/error", nil,
+		ut.Header{Key: "X-Request-Id", Value: "test-id"})
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
@@ -42,6 +42,23 @@ func TestErrorResponse(t *testing.T) {
 	}
 	if resp.RequestID != "test-id" {
 		t.Errorf("expected test-id, got %s", resp.RequestID)
+	}
+}
+
+func TestErrorResponse_NoRequestID(t *testing.T) {
+	engine := route.NewEngine(config.NewOptions([]config.Option{}))
+	engine.GET("/error", func(ctx context.Context, c *app.RequestContext) {
+		ErrorResponse(c, http.StatusBadRequest, "TEST", "msg", nil)
+	})
+
+	w := ut.PerformRequest(engine, http.MethodGet, "/error", nil)
+
+	var resp Error
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if resp.RequestID != "" {
+		t.Errorf("expected empty request_id, got %s", resp.RequestID)
 	}
 }
 

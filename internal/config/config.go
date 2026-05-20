@@ -1,10 +1,9 @@
 package config
 
 import (
-	"sync"
+	"fmt"
 	"time"
 
-	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -16,19 +15,12 @@ type Config struct {
 	AllowedOrigins []string      `env:"ALLOWED_ORIGINS" env-separator:","`
 }
 
-var (
-	instance *Config
-	once     sync.Once
-)
-
-func Get() *Config {
-	once.Do(func() {
-		instance = &Config{}
-		if err := cleanenv.ReadConfig(".env", instance); err != nil {
-			if envErr := cleanenv.ReadEnv(instance); envErr != nil {
-				hlog.Fatalf("config error: %v", envErr)
-			}
+func LoadConfig(path string) (*Config, error) {
+	cfg := &Config{}
+	if err := cleanenv.ReadConfig(path, cfg); err != nil {
+		if envErr := cleanenv.ReadEnv(cfg); envErr != nil {
+			return nil, fmt.Errorf("config: %w", envErr)
 		}
-	})
-	return instance
+	}
+	return cfg, nil
 }

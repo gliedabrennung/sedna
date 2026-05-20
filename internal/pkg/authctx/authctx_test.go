@@ -28,3 +28,12 @@ func TestUserID_NotFound(t *testing.T) {
 		t.Error("expected ok to be false for missing user ID")
 	}
 }
+
+func TestUserID_WrongType(t *testing.T) {
+	c := app.NewContext(16)
+	c.Set(userIDKey, "not-an-int64")
+	_, ok := UserID(c)
+	if ok {
+		t.Error("expected ok to be false for wrong type")
+	}
+}

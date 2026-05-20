@@ -1,20 +1,32 @@
 package messenger
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
 )
 
-func testHub(t *testing.T) (*Hub, func()) {
+func testHub(t *testing.T) (*Hub, context.CancelFunc) {
 	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
 	h := NewHub()
-	go h.Run()
-	return h, h.Stop
+	go h.Run(ctx)
+	return h, cancel
 }
 
 func testClient(id int64) *Client {
 	return &Client{id: id, send: make(chan []byte, 256), done: make(chan struct{})}
+}
+
+func registerClient(t *testing.T, h *Hub, c *Client) {
+	t.Helper()
+	c.hub = h
+	select {
+	case h.register <- c:
+	case <-time.After(time.Second):
+		t.Fatal("timeout registering client")
+	}
 }
 
 func TestHub_Run_DirectMessage(t *testing.T) {
@@ -22,21 +34,23 @@ func TestHub_Run_DirectMessage(t *testing.T) {
 	defer cancel()
 
 	c1 := testClient(1)
-	c1.hub = h
 	c2 := testClient(2)
-	c2.hub = h
-
-	h.register <- c1
-	h.register <- c2
-	time.Sleep(50 * time.Millisecond)
+	registerClient(t, h, c1)
+	registerClient(t, h, c2)
 
 	msg := DirectMessage{From: 1, To: 2, Message: "hello"}
-	h.direct <- msg
+	select {
+	case h.direct <- msg:
+	case <-time.After(time.Second):
+		t.Fatal("timeout sending direct message")
+	}
 
 	select {
 	case gotBytes := <-c2.send:
 		var gotMsg DirectMessage
-		json.Unmarshal(gotBytes, &gotMsg)
+		if err := json.Unmarshal(gotBytes, &gotMsg); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
 		if gotMsg.Message != "hello" || gotMsg.From != 1 {
 			t.Errorf("got %+v, want %+v", gotMsg, msg)
 		}
@@ -44,9 +58,16 @@ func TestHub_Run_DirectMessage(t *testing.T) {
 		t.Fatal("message not delivered to client")
 	}
 
-	h.unregister <- c1
-	h.unregister <- c2
-	time.Sleep(50 * time.Millisecond)
+	select {
+	case h.unregister <- c1:
+	case <-time.After(time.Second):
+		t.Fatal("timeout unregistering c1")
+	}
+	select {
+	case h.unregister <- c2:
+	case <-time.After(time.Second):
+		t.Fatal("timeout unregistering c2")
+	}
 
 	select {
 	case _, ok := <-c1.send:
@@ -63,14 +84,10 @@ func TestHub_Register_ReplacesOldConnection(t *testing.T) {
 	defer cancel()
 
 	c1Old := testClient(1)
-	c1Old.hub = h
-	h.register <- c1Old
-	time.Sleep(50 * time.Millisecond)
+	registerClient(t, h, c1Old)
 
 	c1New := testClient(1)
-	c1New.hub = h
-	h.register <- c1New
-	time.Sleep(50 * time.Millisecond)
+	registerClient(t, h, c1New)
 
 	select {
 	case _, ok := <-c1Old.send:
@@ -87,9 +104,11 @@ func TestHub_DirectMessage_NonExistentClient(t *testing.T) {
 	defer cancel()
 
 	msg := DirectMessage{From: 1, To: 999, Message: "hello"}
-	h.direct <- msg
-
-	time.Sleep(50 * time.Millisecond)
+	select {
+	case h.direct <- msg:
+	case <-time.After(time.Second):
+		t.Fatal("timeout sending to non-existent client")
+	}
 }
 
 func TestHub_Unregister_NotFound(t *testing.T) {
@@ -98,21 +117,20 @@ func TestHub_Unregister_NotFound(t *testing.T) {
 
 	c := testClient(1)
 	c.hub = h
-	h.unregister <- c
-
-	time.Sleep(50 * time.Millisecond)
+	select {
+	case h.unregister <- c:
+	case <-time.After(time.Second):
+		t.Fatal("timeout unregistering unknown client")
+	}
 }
 
 func TestHub_Shutdown(t *testing.T) {
 	h, cancel := testHub(t)
 
 	c := testClient(1)
-	c.hub = h
-	h.register <- c
-	time.Sleep(50 * time.Millisecond)
+	registerClient(t, h, c)
 
 	cancel()
-	time.Sleep(100 * time.Millisecond)
 
 	select {
 	case _, ok := <-c.send:
@@ -121,5 +139,24 @@ func TestHub_Shutdown(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("client channel not closed after shutdown")
+	}
+}
+
+func TestHub_Shutdown_ViaStop(t *testing.T) {
+	h, cancel := testHub(t)
+	defer cancel()
+
+	c := testClient(1)
+	registerClient(t, h, c)
+
+	h.Stop()
+
+	select {
+	case _, ok := <-c.send:
+		if ok {
+			t.Error("expected client channel to be closed on stop")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("client channel not closed after stop")
 	}
 }

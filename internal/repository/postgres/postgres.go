@@ -27,7 +27,7 @@ func (repo *Repository) Create(ctx context.Context, user *entity.User) error {
 		INSERT INTO users (username, password)
 		VALUES ($1, $2)
 		RETURNING id, created_at, updated_at`
-	err := repo.db.QueryRow(ctx, query, user.Username, user.Password).
+	err := repo.db.QueryRow(ctx, query, user.Username, user.PasswordHash).
 		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -46,7 +46,7 @@ func (repo *Repository) GetByUsername(ctx context.Context, username string) (*en
 		WHERE username = $1`
 	user := &entity.User{}
 	err := repo.db.QueryRow(ctx, query, username).
-		Scan(&user.ID, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+		Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperr.ErrUserNotFound

@@ -17,7 +17,7 @@ type Error struct {
 }
 
 func ErrorResponse(c *app.RequestContext, status int, code string, message string, details any) {
-	requestID := string(c.Response.Header.Peek("X-Request-Id"))
+	requestID := string(c.GetHeader("X-Request-Id"))
 	resp := Error{
 		Status:    status,
 		Code:      code,

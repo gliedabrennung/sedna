@@ -84,7 +84,9 @@ func main() {
 		log.Fatal("write:", err)
 	}
 
-	c2.SetReadDeadline(time.Now().Add(time.Second))
+	if err := c2.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		log.Fatal("set read deadline:", err)
+	}
 	_, p, err := c2.ReadMessage()
 	if err != nil {
 		log.Fatal("read c2:", err)
