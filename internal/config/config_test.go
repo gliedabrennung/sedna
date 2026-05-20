@@ -6,7 +6,18 @@ import (
 	"testing"
 )
 
+func clearEnv() {
+	os.Unsetenv("DSN")
+	os.Unsetenv("JWT_SECRET")
+	os.Unsetenv("JWT_TTL")
+	os.Unsetenv("ADDR")
+	os.Unsetenv("ALLOWED_ORIGINS")
+}
+
 func TestLoadConfig_FromFile(t *testing.T) {
+	clearEnv()
+	defer clearEnv()
+
 	dir := t.TempDir()
 	envPath := filepath.Join(dir, ".env")
 	content := "DSN=postgres://localhost/test\nJWT_SECRET=testsecret\nJWT_TTL=1h\nADDR=:9090\n"
@@ -31,6 +42,9 @@ func TestLoadConfig_FromFile(t *testing.T) {
 }
 
 func TestLoadConfig_MissingFile_FallsBackToEnv(t *testing.T) {
+	clearEnv()
+	defer clearEnv()
+
 	t.Setenv("DSN", "postgres://envhost/db")
 	t.Setenv("JWT_SECRET", "envsecret")
 
@@ -45,6 +59,9 @@ func TestLoadConfig_MissingFile_FallsBackToEnv(t *testing.T) {
 }
 
 func TestLoadConfig_MissingRequired(t *testing.T) {
+	clearEnv()
+	defer clearEnv()
+
 	_, err := LoadConfig("nonexistent.env")
 	if err == nil {
 		t.Error("expected error for missing required fields")
@@ -52,6 +69,9 @@ func TestLoadConfig_MissingRequired(t *testing.T) {
 }
 
 func TestLoadConfig_Defaults(t *testing.T) {
+	clearEnv()
+	defer clearEnv()
+
 	t.Setenv("DSN", "postgres://localhost/db")
 	t.Setenv("JWT_SECRET", "secret")
 
