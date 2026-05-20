@@ -61,8 +61,9 @@ func (a *AuthUseCase) Register(ctx context.Context, username, password string) (
 		return nil, fmt.Errorf("register: create user: %w", err)
 	}
 
-	user.PasswordHash = ""
-	return user, nil
+	retUser := *user
+	retUser.PasswordHash = ""
+	return &retUser, nil
 }
 
 func (a *AuthUseCase) Login(ctx context.Context, username, password string) (*entity.User, string, error) {
@@ -91,6 +92,7 @@ func (a *AuthUseCase) Login(ctx context.Context, username, password string) (*en
 		return nil, "", fmt.Errorf("login: sign token: %w", err)
 	}
 
-	user.PasswordHash = ""
-	return user, token, nil
+	retUser := *user
+	retUser.PasswordHash = ""
+	return &retUser, token, nil
 }
