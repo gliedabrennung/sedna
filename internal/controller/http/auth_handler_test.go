@@ -2,7 +2,6 @@ package http
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -11,34 +10,13 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/cloudwego/hertz/pkg/common/ut"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
-	"github.com/gliedabrennung/messenger-core/internal/repository"
+	"github.com/gliedabrennung/messenger-core/internal/testutil"
 	"github.com/gliedabrennung/messenger-core/internal/usecase"
 )
 
-type mockUserRepo struct {
-	users map[string]*entity.User
-}
-
-func (m *mockUserRepo) Create(ctx context.Context, user *entity.User) error {
-	if _, ok := m.users[user.Username]; ok {
-		return repository.ErrUserAlreadyExists
-	}
-	m.users[user.Username] = user
-	user.ID = int64(len(m.users))
-	return nil
-}
-
-func (m *mockUserRepo) GetByUsername(ctx context.Context, username string) (*entity.User, error) {
-	user, ok := m.users[username]
-	if !ok {
-		return nil, repository.ErrUserNotFound
-	}
-	return user, nil
-}
-
 func setupAuthHandler(t *testing.T) (*route.Engine, *AuthHandler) {
-	repo := &mockUserRepo{users: make(map[string]*entity.User)}
+	t.Helper()
+	repo := testutil.NewMockUserRepo()
 	au := usecase.NewAuthUseCase(repo, "secret", time.Hour)
 	handler := NewAuthHandler(au)
 
@@ -59,7 +37,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		})
 		w := ut.PerformRequest(engine, http.MethodPost, "/register", &ut.Body{Body: bytes.NewBuffer(reqBody), Len: len(reqBody)},
 			ut.Header{Key: "Content-Type", Value: "application/json"})
-		
+
 		if w.Code != http.StatusCreated {
 			t.Errorf("expected 201, got %d. Body: %s", w.Code, string(w.Body.Bytes()))
 		}
@@ -72,7 +50,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		})
 		w := ut.PerformRequest(engine, http.MethodPost, "/register", &ut.Body{Body: bytes.NewBuffer(reqBody), Len: len(reqBody)},
 			ut.Header{Key: "Content-Type", Value: "application/json"})
-		
+
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("expected 400, got %d", w.Code)
 		}
@@ -89,7 +67,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		// Register again
 		w := ut.PerformRequest(engine, http.MethodPost, "/register", &ut.Body{Body: bytes.NewBuffer(reqBody), Len: len(reqBody)},
 			ut.Header{Key: "Content-Type", Value: "application/json"})
-		
+
 		if w.Code != http.StatusConflict {
 			t.Errorf("expected 409, got %d", w.Code)
 		}
@@ -114,7 +92,7 @@ func TestAuthHandler_Login(t *testing.T) {
 		})
 		w := ut.PerformRequest(engine, http.MethodPost, "/login", &ut.Body{Body: bytes.NewBuffer(reqBody), Len: len(reqBody)},
 			ut.Header{Key: "Content-Type", Value: "application/json"})
-		
+
 		if w.Code != http.StatusOK {
 			t.Errorf("expected 200, got %d. Body: %s", w.Code, string(w.Body.Bytes()))
 		}
@@ -133,7 +111,7 @@ func TestAuthHandler_Login(t *testing.T) {
 		})
 		w := ut.PerformRequest(engine, http.MethodPost, "/login", &ut.Body{Body: bytes.NewBuffer(reqBody), Len: len(reqBody)},
 			ut.Header{Key: "Content-Type", Value: "application/json"})
-		
+
 		if w.Code != http.StatusUnauthorized {
 			t.Errorf("expected 401, got %d", w.Code)
 		}

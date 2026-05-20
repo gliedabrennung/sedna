@@ -1,6 +1,11 @@
 package messenger
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+)
 
 type Hub struct {
 	clients    map[int64]*Client
@@ -15,12 +20,6 @@ type DirectMessage struct {
 	Message string `json:"message"`
 }
 
-var hub = NewHub()
-
-func StartHub() {
-	hub.Run()
-}
-
 func NewHub() *Hub {
 	return &Hub{
 		register:   make(chan *Client),
@@ -30,9 +29,17 @@ func NewHub() *Hub {
 	}
 }
 
-func (h *Hub) Run() {
+// Run processes hub events until ctx is cancelled. Must be called in a goroutine.
+func (h *Hub) Run(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			for id, client := range h.clients {
+				close(client.send)
+				delete(h.clients, id)
+			}
+			hlog.Info("hub: shutdown complete")
+			return
 		case client := <-h.register:
 			if oldClient, ok := h.clients[client.id]; ok {
 				close(oldClient.send)
@@ -47,6 +54,7 @@ func (h *Hub) Run() {
 			if client, ok := h.clients[msg.To]; ok {
 				msgBytes, err := json.Marshal(msg)
 				if err != nil {
+					hlog.Errorf("hub: marshal direct message: %v", err)
 					continue
 				}
 				select {

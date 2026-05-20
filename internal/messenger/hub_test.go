@@ -1,21 +1,32 @@
 package messenger
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
 )
+
+func testHub(t *testing.T) (*Hub, context.CancelFunc) {
+	t.Helper()
+	h := NewHub()
+	ctx, cancel := context.WithCancel(context.Background())
+	go h.Run(ctx)
+	return h, cancel
+}
 
 func testClient(id int64) *Client {
 	return &Client{id: id, send: make(chan []byte, 256), done: make(chan struct{})}
 }
 
 func TestHub_Run_DirectMessage(t *testing.T) {
-	h := NewHub()
-	go h.Run()
+	h, cancel := testHub(t)
+	defer cancel()
 
 	c1 := testClient(1)
+	c1.hub = h
 	c2 := testClient(2)
+	c2.hub = h
 
 	h.register <- c1
 	h.register <- c2
@@ -51,19 +62,21 @@ func TestHub_Run_DirectMessage(t *testing.T) {
 }
 
 func TestHub_Register_ReplacesOldConnection(t *testing.T) {
-	h := NewHub()
-	go h.Run()
+	h, cancel := testHub(t)
+	defer cancel()
 
-	c1_old := testClient(1)
-	h.register <- c1_old
+	c1Old := testClient(1)
+	c1Old.hub = h
+	h.register <- c1Old
 	time.Sleep(50 * time.Millisecond)
 
-	c1_new := testClient(1)
-	h.register <- c1_new
+	c1New := testClient(1)
+	c1New.hub = h
+	h.register <- c1New
 	time.Sleep(50 * time.Millisecond)
 
 	select {
-	case _, ok := <-c1_old.send:
+	case _, ok := <-c1Old.send:
 		if ok {
 			t.Error("expected old connection channel to be closed")
 		}
@@ -73,8 +86,8 @@ func TestHub_Register_ReplacesOldConnection(t *testing.T) {
 }
 
 func TestHub_DirectMessage_NonExistentClient(t *testing.T) {
-	h := NewHub()
-	go h.Run()
+	h, cancel := testHub(t)
+	defer cancel()
 
 	msg := DirectMessage{From: 1, To: 999, Message: "hello"}
 	h.direct <- msg
@@ -83,11 +96,33 @@ func TestHub_DirectMessage_NonExistentClient(t *testing.T) {
 }
 
 func TestHub_Unregister_NotFound(t *testing.T) {
-	h := NewHub()
-	go h.Run()
+	h, cancel := testHub(t)
+	defer cancel()
 
 	c := testClient(1)
+	c.hub = h
 	h.unregister <- c
 	// Should not panic or block
 	time.Sleep(50 * time.Millisecond)
+}
+
+func TestHub_Shutdown(t *testing.T) {
+	h, cancel := testHub(t)
+
+	c := testClient(1)
+	c.hub = h
+	h.register <- c
+	time.Sleep(50 * time.Millisecond)
+
+	cancel() // trigger shutdown
+	time.Sleep(100 * time.Millisecond)
+
+	select {
+	case _, ok := <-c.send:
+		if ok {
+			t.Error("expected client channel to be closed on shutdown")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("client channel not closed after shutdown")
+	}
 }

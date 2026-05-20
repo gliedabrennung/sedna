@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"log"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
-	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/gliedabrennung/messenger-core/internal/config"
 	"github.com/gliedabrennung/messenger-core/internal/controller/http"
 	"github.com/gliedabrennung/messenger-core/internal/messenger"
@@ -14,38 +17,51 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var addr = ":8080"
-
 func main() {
-	cfg := config.GetConfig()
-
-	go messenger.StartHub()
-
-	dbpool, err := pgxpool.New(context.Background(), cfg.DSN)
+	cfg, err := config.LoadConfig(".env")
 	if err != nil {
-		hlog.Errorf("Unable to create connection pool: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	dbpool, err := pgxpool.New(ctx, cfg.DSN)
+	if err != nil {
+		log.Fatalf("unable to create connection pool: %v", err)
 	}
 	defer dbpool.Close()
 
 	if sqlBytes, err := os.ReadFile("migrations/0001.sql"); err == nil {
-		if _, err := dbpool.Exec(context.Background(), string(sqlBytes)); err != nil {
-			hlog.Errorf("Failed to run migrations: %v\n", err)
-			os.Exit(1)
+		if _, err := dbpool.Exec(ctx, string(sqlBytes)); err != nil {
+			log.Fatalf("failed to run migrations: %v", err)
 		}
 	} else {
-		hlog.Warnf("Could not read migration file: %v\n", err)
+		log.Printf("WARNING: could not read migration file: %v", err)
 	}
 
 	repo := postgres.NewPostgresRepository(dbpool)
 	authUseCase := usecase.NewAuthUseCase(repo, cfg.JWTSecret, cfg.JWTTTL)
 
+	hub := messenger.NewHub()
+	go hub.Run(ctx)
+
+	allowedOrigins := []string{"*"} // TODO: configure per environment
+	if v := os.Getenv("ALLOWED_ORIGINS"); v != "" {
+		allowedOrigins = strings.Split(v, ",")
+	}
+
 	h := server.Default(
-		server.WithHostPorts(addr),
+		server.WithHostPorts(cfg.Addr),
 		server.WithHandleMethodNotAllowed(true),
 	)
 
-	http.SetupRouter(h, authUseCase, cfg.JWTSecret)
+	http.SetupRouter(h, http.Deps{
+		Auth:           authUseCase,
+		Hub:            hub,
+		JWTSecret:      cfg.JWTSecret,
+		AllowedOrigins: allowedOrigins,
+	})
 
 	h.Spin()
 }

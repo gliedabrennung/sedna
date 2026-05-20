@@ -1,11 +1,9 @@
 package messenger
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -22,15 +20,8 @@ const (
 	maxMessageSize = 1024
 )
 
-var upgrader = websocket.HertzUpgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(ctx *app.RequestContext) bool {
-		return true
-	},
-}
-
 type Client struct {
+	hub  *Hub
 	id   int64
 	conn *websocket.Conn
 	send chan []byte
@@ -38,50 +29,47 @@ type Client struct {
 }
 
 type incomingMessage struct {
-	To      any    `json:"to"`
-	Message string `json:"message"`
+	To      json.Number `json:"to"`
+	Message string      `json:"message"`
 }
 
 func (c *Client) readPump() {
 	defer func() {
-		hub.unregister <- c
+		c.hub.unregister <- c
 		<-c.done
 	}()
+
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		hlog.Errorf("ws: set read deadline: %v", err)
+		return
+	}
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				hlog.Errorf("websocket read error: %v", err)
+				hlog.Errorf("ws: read error: %v", err)
 			}
 			break
 		}
 
 		var inc incomingMessage
-		if err := json.NewDecoder(bytes.NewReader(message)).Decode(&inc); err != nil {
-			hlog.Errorf("invalid json format: %v", err)
+		if err := json.Unmarshal(message, &inc); err != nil {
+			hlog.Errorf("ws: invalid json: %v", err)
 			continue
 		}
 
-		var toID int64
-		switch v := inc.To.(type) {
-		case float64:
-			toID = int64(v)
-		case string:
-			parsed, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				hlog.Errorf("invalid 'to' ID format: %v", err)
-				continue
-			}
-			toID = parsed
-		default:
-			hlog.Errorf("invalid 'to' ID type")
+		toID, err := inc.To.Int64()
+		if err != nil {
+			hlog.Errorf("ws: invalid 'to' ID: %v", err)
 			continue
 		}
 
-		hub.direct <- DirectMessage{
+		c.hub.direct <- DirectMessage{
 			From:    c.id,
 			To:      toID,
 			Message: inc.Message,
@@ -96,32 +84,26 @@ func (c *Client) writePump() {
 		c.conn.Close()
 		close(c.done)
 	}()
+
 	for {
 		select {
 		case message, ok := <-c.send:
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				hlog.Errorf("ws: set write deadline: %v", err)
 				return
 			}
-			w.Write(message)
-
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.send)
-			}
-
-			if err := w.Close(); err != nil {
+			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				hlog.Errorf("ws: set write deadline (ping): %v", err)
+				return
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -129,29 +111,57 @@ func (c *Client) writePump() {
 	}
 }
 
-func ServeWs(ctx context.Context, c *app.RequestContext) {
-	userID, ok := authctx.UserID(c)
-	if !ok {
-		api.ErrorResponse(c, http.StatusUnauthorized, "UNAUTHORIZED", "missing user context", nil)
-		return
+// NewUpgrader creates a WebSocket upgrader with the given allowed origins.
+// If allowedOrigins is empty, all origins are rejected.
+func NewUpgrader(allowedOrigins []string) websocket.HertzUpgrader {
+	allowed := make(map[string]bool, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		allowed[o] = true
 	}
+	return websocket.HertzUpgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(ctx *app.RequestContext) bool {
+			if len(allowed) == 0 {
+				return false
+			}
+			if allowed["*"] {
+				return true
+			}
+			origin := string(ctx.GetHeader("Origin"))
+			return allowed[origin]
+		},
+	}
+}
 
-	err := upgrader.Upgrade(c, func(conn *websocket.Conn) {
-		client := &Client{
-			id:   userID,
-			conn: conn,
-			send: make(chan []byte, 256),
-			done: make(chan struct{}),
+// ServeWs returns a handler that upgrades HTTP connections to WebSocket.
+// Hub and upgrader are injected as dependencies.
+func ServeWs(hub *Hub, upgrader websocket.HertzUpgrader) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		userID, ok := authctx.UserID(c)
+		if !ok {
+			api.ErrorResponse(c, http.StatusUnauthorized, "UNAUTHORIZED", "missing user context", nil)
+			return
 		}
-		hub.register <- client
 
-		go client.writePump()
-		client.readPump()
-	})
+		err := upgrader.Upgrade(c, func(conn *websocket.Conn) {
+			client := &Client{
+				hub:  hub,
+				id:   userID,
+				conn: conn,
+				send: make(chan []byte, 256),
+				done: make(chan struct{}),
+			}
+			hub.register <- client
 
-	if err != nil {
-		hlog.CtxErrorf(ctx, "upgrade error: %v", err)
-		api.ErrorResponse(c, http.StatusInternalServerError, "WEBSOCKET_UPGRADE_FAILED", "Could not upgrade to websocket connection", err.Error())
-		return
+			go client.writePump()
+			client.readPump()
+		})
+
+		if err != nil {
+			hlog.CtxErrorf(ctx, "ws: upgrade error: %v", err)
+			api.ErrorResponse(c, http.StatusInternalServerError,
+				"WEBSOCKET_UPGRADE_FAILED", "could not upgrade to websocket connection", nil)
+		}
 	}
 }

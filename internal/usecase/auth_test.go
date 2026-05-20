@@ -5,30 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gliedabrennung/messenger-core/internal/entity"
-	"github.com/gliedabrennung/messenger-core/internal/repository"
+	"github.com/gliedabrennung/messenger-core/internal/apperr"
+	"github.com/gliedabrennung/messenger-core/internal/testutil"
 )
 
-type mockUserRepo struct {
-	users map[string]*entity.User
-}
-
-func (m *mockUserRepo) Create(ctx context.Context, user *entity.User) error {
-	m.users[user.Username] = user
-	user.ID = int64(len(m.users))
-	return nil
-}
-
-func (m *mockUserRepo) GetByUsername(ctx context.Context, username string) (*entity.User, error) {
-	user, ok := m.users[username]
-	if !ok {
-		return nil, repository.ErrUserNotFound
-	}
-	return user, nil
-}
-
 func TestAuthUseCase_Register(t *testing.T) {
-	repo := &mockUserRepo{users: make(map[string]*entity.User)}
+	repo := testutil.NewMockUserRepo()
 	au := NewAuthUseCase(repo, "secret", time.Hour)
 
 	ctx := context.Background()
@@ -42,13 +24,13 @@ func TestAuthUseCase_Register(t *testing.T) {
 	}
 
 	_, err = au.Register(ctx, "testuser", "password")
-	if err != ErrUserAlreadyExists {
+	if err != apperr.ErrUserAlreadyExists {
 		t.Errorf("expected ErrUserAlreadyExists, got %v", err)
 	}
 }
 
 func TestAuthUseCase_Login(t *testing.T) {
-	repo := &mockUserRepo{users: make(map[string]*entity.User)}
+	repo := testutil.NewMockUserRepo()
 	au := NewAuthUseCase(repo, "secret", time.Hour)
 
 	ctx := context.Background()
@@ -69,14 +51,14 @@ func TestAuthUseCase_Login(t *testing.T) {
 
 	t.Run("InvalidPassword", func(t *testing.T) {
 		_, _, err := au.Login(ctx, "testuser", "wrongpassword")
-		if err != ErrInvalidCredentials {
+		if err != apperr.ErrInvalidCredentials {
 			t.Errorf("expected ErrInvalidCredentials, got %v", err)
 		}
 	})
 
 	t.Run("UserNotFound", func(t *testing.T) {
 		_, _, err := au.Login(ctx, "nonexistent", "password")
-		if err != ErrInvalidCredentials {
+		if err != apperr.ErrInvalidCredentials {
 			t.Errorf("expected ErrInvalidCredentials, got %v", err)
 		}
 	})

@@ -3,20 +3,17 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/gliedabrennung/messenger-core/internal/apperr"
 	"github.com/gliedabrennung/messenger-core/internal/entity"
-	"github.com/gliedabrennung/messenger-core/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var (
-	ErrUserAlreadyExists  = errors.New("user already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-)
-
+// UserRepository is defined on the consumer side per Uber Go Style Guide.
 type UserRepository interface {
 	Create(ctx context.Context, user *entity.User) error
 	GetByUsername(ctx context.Context, username string) (*entity.User, error)
@@ -39,15 +36,15 @@ func NewAuthUseCase(repo UserRepository, jwtSecret string, jwtTTL time.Duration)
 func (a *AuthUseCase) Register(ctx context.Context, username, password string) (*entity.User, error) {
 	existing, err := a.repo.GetByUsername(ctx, username)
 	if err == nil && existing != nil {
-		return nil, ErrUserAlreadyExists
+		return nil, apperr.ErrUserAlreadyExists
 	}
-	if err != nil && !errors.Is(err, repository.ErrUserNotFound) {
-		return nil, err
+	if err != nil && !errors.Is(err, apperr.ErrUserNotFound) {
+		return nil, fmt.Errorf("register: check existing user: %w", err)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("register: hash password: %w", err)
 	}
 
 	user := &entity.User{
@@ -56,10 +53,10 @@ func (a *AuthUseCase) Register(ctx context.Context, username, password string) (
 	}
 
 	if err := a.repo.Create(ctx, user); err != nil {
-		if errors.Is(err, repository.ErrUserAlreadyExists) {
-			return nil, ErrUserAlreadyExists
+		if errors.Is(err, apperr.ErrUserAlreadyExists) {
+			return nil, apperr.ErrUserAlreadyExists
 		}
-		return nil, err
+		return nil, fmt.Errorf("register: create user: %w", err)
 	}
 
 	return user, nil
@@ -68,15 +65,14 @@ func (a *AuthUseCase) Register(ctx context.Context, username, password string) (
 func (a *AuthUseCase) Login(ctx context.Context, username, password string) (*entity.User, string, error) {
 	user, err := a.repo.GetByUsername(ctx, username)
 	if err != nil {
-		return nil, "", ErrInvalidCredentials
-	}
-
-	if user == nil {
-		return nil, "", ErrInvalidCredentials
+		if errors.Is(err, apperr.ErrUserNotFound) {
+			return nil, "", apperr.ErrInvalidCredentials
+		}
+		return nil, "", fmt.Errorf("login: get user: %w", err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return nil, "", ErrInvalidCredentials
+		return nil, "", apperr.ErrInvalidCredentials
 	}
 
 	claims := jwt.RegisteredClaims{
@@ -88,7 +84,7 @@ func (a *AuthUseCase) Login(ctx context.Context, username, password string) (*en
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	token, err := t.SignedString([]byte(a.jwtSecret))
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("login: sign token: %w", err)
 	}
 
 	return user, token, nil

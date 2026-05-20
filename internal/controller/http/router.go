@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-
 	"net/http"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -10,10 +9,19 @@ import (
 	"github.com/gliedabrennung/messenger-core/internal/controller/http/middleware"
 	"github.com/gliedabrennung/messenger-core/internal/messenger"
 	"github.com/gliedabrennung/messenger-core/internal/pkg/api"
-	"github.com/gliedabrennung/messenger-core/internal/usecase"
 )
 
-func SetupRouter(h *server.Hertz, authUseCase *usecase.AuthUseCase, jwtSecret string) {
+// Deps holds all external dependencies for the HTTP router.
+type Deps struct {
+	Auth      AuthService
+	Hub       *messenger.Hub
+	JWTSecret string
+	// AllowedOrigins is the list of allowed WebSocket origins.
+	// Use ["*"] to allow all origins (development only).
+	AllowedOrigins []string
+}
+
+func SetupRouter(h *server.Hertz, deps Deps) {
 	h.Use(api.CustomErrorHandler())
 	h.NoRoute(func(ctx context.Context, c *app.RequestContext) {
 		api.ErrorResponse(c, http.StatusNotFound,
@@ -28,7 +36,7 @@ func SetupRouter(h *server.Hertz, authUseCase *usecase.AuthUseCase, jwtSecret st
 			nil)
 	})
 
-	authHandler := NewAuthHandler(authUseCase)
+	authHandler := NewAuthHandler(deps.Auth)
 
 	h.GET("/", ServeHome)
 
@@ -36,5 +44,6 @@ func SetupRouter(h *server.Hertz, authUseCase *usecase.AuthUseCase, jwtSecret st
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
 
-	h.GET("/ws", middleware.JWTAuth(jwtSecret), messenger.ServeWs)
+	upgrader := messenger.NewUpgrader(deps.AllowedOrigins)
+	h.GET("/ws", middleware.JWTAuth(deps.JWTSecret), messenger.ServeWs(deps.Hub, upgrader))
 }

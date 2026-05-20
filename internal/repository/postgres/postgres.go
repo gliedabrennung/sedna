@@ -3,9 +3,10 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/gliedabrennung/messenger-core/internal/apperr"
 	"github.com/gliedabrennung/messenger-core/internal/entity"
-	"github.com/gliedabrennung/messenger-core/internal/repository"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,9 +32,9 @@ func (repo *Repository) Create(ctx context.Context, user *entity.User) error {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
-			return repository.ErrUserAlreadyExists
+			return apperr.ErrUserAlreadyExists
 		}
-		return err
+		return fmt.Errorf("postgres: create user: %w", err)
 	}
 	return nil
 }
@@ -48,9 +49,9 @@ func (repo *Repository) GetByUsername(ctx context.Context, username string) (*en
 		Scan(&user.ID, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, repository.ErrUserNotFound
+			return nil, apperr.ErrUserNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("postgres: get user by username: %w", err)
 	}
 	return user, nil
 }

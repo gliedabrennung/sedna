@@ -1,10 +1,9 @@
 package config
 
 import (
-	"sync"
+	"fmt"
 	"time"
 
-	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -12,21 +11,17 @@ type Config struct {
 	DSN       string        `env:"DSN" env-required:"true"`
 	JWTSecret string        `env:"JWT_SECRET" env-required:"true"`
 	JWTTTL    time.Duration `env:"JWT_TTL" env-default:"24h"`
+	Addr      string        `env:"ADDR" env-default:":8080"`
 }
 
-var (
-	instance *Config
-	once     sync.Once
-)
-
-func GetConfig() *Config {
-	once.Do(func() {
-		instance = &Config{}
-		if err := cleanenv.ReadConfig(".env", instance); err != nil {
-			if envErr := cleanenv.ReadEnv(instance); envErr != nil {
-				hlog.Fatalf("config error: %v", envErr)
-			}
+// LoadConfig reads configuration from the given file, falling back to
+// environment variables if the file cannot be read.
+func LoadConfig(path string) (*Config, error) {
+	cfg := &Config{}
+	if err := cleanenv.ReadConfig(path, cfg); err != nil {
+		if envErr := cleanenv.ReadEnv(cfg); envErr != nil {
+			return nil, fmt.Errorf("config: %w", envErr)
 		}
-	})
-	return instance
+	}
+	return cfg, nil
 }

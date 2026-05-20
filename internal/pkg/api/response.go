@@ -9,14 +9,14 @@ import (
 )
 
 type Error struct {
-	Status    int         `json:"status"`
-	Code      string      `json:"code"`
-	Message   string      `json:"message"`
-	Details   interface{} `json:"details,omitempty"`
-	RequestID string      `json:"request_id,omitempty"`
+	Status    int    `json:"status"`
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Details   any    `json:"details,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
 }
 
-func ErrorResponse(c *app.RequestContext, status int, code string, message string, details interface{}) {
+func ErrorResponse(c *app.RequestContext, status int, code string, message string, details any) {
 	requestID := string(c.Response.Header.Peek("X-Request-Id"))
 	resp := Error{
 		Status:    status,
