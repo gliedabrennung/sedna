@@ -9,10 +9,15 @@ import (
 	"github.com/gliedabrennung/messenger-core/internal/config"
 	"github.com/gliedabrennung/messenger-core/internal/controller/http"
 	"github.com/gliedabrennung/messenger-core/internal/controller/http/middleware"
+	"github.com/gliedabrennung/messenger-core/internal/domain"
 	"github.com/gliedabrennung/messenger-core/internal/messenger"
+	"github.com/gliedabrennung/messenger-core/internal/repository/message"
 	"github.com/gliedabrennung/messenger-core/internal/repository/postgres"
 	"github.com/gliedabrennung/messenger-core/internal/usecase"
+	"github.com/gocql/gocql"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
+	"time"
 )
 
 func main() {
@@ -35,13 +40,46 @@ func run() error {
 	}
 	defer dbpool.Close()
 
+	var scyllaSession *gocql.Session
+	if err := message.InitSchema(ctx, cfg.ScyllaHosts, cfg.ScyllaKeyspace); err != nil {
+		log.Printf("warning: could not initialize scylla schema (skipping messages feature): %v", err)
+	} else {
+		cluster := gocql.NewCluster(cfg.ScyllaHosts...)
+		cluster.Keyspace = cfg.ScyllaKeyspace
+		cluster.Timeout = 5 * time.Second
+		var err error
+		scyllaSession, err = cluster.CreateSession()
+		if err != nil {
+			log.Printf("warning: could not connect to scylla (skipping messages feature): %v", err)
+			scyllaSession = nil
+		} else {
+			defer scyllaSession.Close()
+		}
+	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+	})
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Printf("warning: could not connect to redis (skipping cache/pubsub): %v", err)
+		rdb = nil
+	} else {
+		defer rdb.Close()
+	}
+
+	var msgRepo domain.MessageRepository
+	if scyllaSession != nil && rdb != nil {
+		msgRepo = message.NewRepository(scyllaSession, rdb)
+	}
+
 	repo := postgres.NewPostgresRepository(dbpool)
 	authUseCase := usecase.NewAuthUseCase(repo, cfg.JWTSecret, cfg.JWTTTL)
 
 	hubCtx, hubCancel := context.WithCancel(ctx)
 	defer hubCancel()
 
-	hub := messenger.NewHub()
+	hub := messenger.NewHub(msgRepo)
 	go hub.Run(hubCtx)
 
 	h := server.Default(

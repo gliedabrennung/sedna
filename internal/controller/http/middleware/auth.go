@@ -53,6 +53,9 @@ func JWTAuth(secret string) app.HandlerFunc {
 		}
 
 		authctx.SetUserID(c, userID)
+		if claims.ExpiresAt != nil {
+			authctx.SetTokenExp(c, claims.ExpiresAt.Time)
+		}
 		c.Next(ctx)
 	}
 }

@@ -9,6 +9,10 @@ import (
 
 type Config struct {
 	DSN            string        `env:"DSN" env-required:"true"`
+	ScyllaHosts    []string      `env:"SCYLLA_HOSTS" env-default:"localhost" env-separator:","`
+	ScyllaKeyspace string        `env:"SCYLLA_KEYSPACE" env-default:"messenger"`
+	RedisAddr      string        `env:"REDIS_ADDR" env-default:"localhost:6379"`
+	RedisPassword  string        `env:"REDIS_PASSWORD"`
 	JWTSecret      string        `env:"JWT_SECRET" env-required:"true"`
 	JWTTTL         time.Duration `env:"JWT_TTL" env-default:"24h"`
 	Addr           string        `env:"ADDR" env-default:":8080"`
