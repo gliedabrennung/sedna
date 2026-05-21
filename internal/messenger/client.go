@@ -8,8 +8,8 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
-	"github.com/gliedabrennung/messenger-core/internal/pkg/api"
-	"github.com/gliedabrennung/messenger-core/internal/pkg/authctx"
+	"github.com/gliedabrennung/messenger-core/internal/common/api"
+	"github.com/gliedabrennung/messenger-core/internal/common/authctx"
 	"github.com/hertz-contrib/websocket"
 )
 
@@ -156,7 +156,7 @@ func ServeWs(hub *Hub, upgrader websocket.HertzUpgrader) app.HandlerFunc {
 				send: make(chan []byte, 256),
 				done: make(chan struct{}),
 			}
-			
+
 			select {
 			case hub.register <- client:
 			case <-hub.done:
