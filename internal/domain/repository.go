@@ -3,7 +3,7 @@ package domain
 import (
 	"context"
 
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/entity"
 )
 
 type UserRepository interface {

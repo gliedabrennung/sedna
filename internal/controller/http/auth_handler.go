@@ -7,10 +7,10 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol"
-	"github.com/gliedabrennung/messenger-core/internal/apperr"
-	"github.com/gliedabrennung/messenger-core/internal/common/api"
-	"github.com/gliedabrennung/messenger-core/internal/common/logger"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/apperr"
+	"github.com/gliedabrennung/sedna/internal/common/api"
+	"github.com/gliedabrennung/sedna/internal/common/logger"
+	"github.com/gliedabrennung/sedna/internal/entity"
 )
 
 type AuthService interface {

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/gliedabrennung/messenger-core/internal/common/api"
-	"github.com/gliedabrennung/messenger-core/internal/common/authctx"
+	"github.com/gliedabrennung/sedna/internal/common/api"
+	"github.com/gliedabrennung/sedna/internal/common/authctx"
 	"github.com/golang-jwt/jwt/v5"
 )
 

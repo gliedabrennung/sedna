@@ -10,8 +10,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/cloudwego/hertz/pkg/common/ut"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gliedabrennung/messenger-core/internal/testutil"
-	"github.com/gliedabrennung/messenger-core/internal/usecase"
+	"github.com/gliedabrennung/sedna/internal/testutil"
+	"github.com/gliedabrennung/sedna/internal/usecase"
 )
 
 func setupAuthHandler(t *testing.T) (*route.Engine, *AuthHandler) {

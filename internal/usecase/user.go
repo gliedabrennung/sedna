@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gliedabrennung/messenger-core/internal/domain"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/domain"
+	"github.com/gliedabrennung/sedna/internal/entity"
 )
 
 type UserUseCase struct {

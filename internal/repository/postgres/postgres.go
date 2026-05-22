@@ -7,8 +7,8 @@ import (
 
 	"strconv"
 
-	"github.com/gliedabrennung/messenger-core/internal/apperr"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/apperr"
+	"github.com/gliedabrennung/sedna/internal/entity"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"

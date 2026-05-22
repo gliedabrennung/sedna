@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/gliedabrennung/messenger-core/internal/common/api"
-	"github.com/gliedabrennung/messenger-core/internal/common/authctx"
-	"github.com/gliedabrennung/messenger-core/internal/common/logger"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/common/api"
+	"github.com/gliedabrennung/sedna/internal/common/authctx"
+	"github.com/gliedabrennung/sedna/internal/common/logger"
+	"github.com/gliedabrennung/sedna/internal/entity"
 	"github.com/hertz-contrib/websocket"
 )
 

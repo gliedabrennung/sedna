@@ -9,9 +9,9 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
-	"github.com/gliedabrennung/messenger-core/internal/common/api"
-	"github.com/gliedabrennung/messenger-core/internal/controller/http/middleware"
-	"github.com/gliedabrennung/messenger-core/internal/domain"
+	"github.com/gliedabrennung/sedna/internal/common/api"
+	"github.com/gliedabrennung/sedna/internal/controller/http/middleware"
+	"github.com/gliedabrennung/sedna/internal/domain"
 )
 
 type Deps struct {
