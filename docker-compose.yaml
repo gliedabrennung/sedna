@@ -8,6 +8,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      scylla:
+        condition: service_healthy
 
   db:
     image: postgres:16-alpine
@@ -20,7 +24,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,7 +34,7 @@ services:
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -43,10 +47,10 @@ services:
     volumes:
       - scylla_data:/var/lib/scylla
     healthcheck:
-      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
+      test: [ "CMD-SHELL", "cqlsh -e 'describe keyspaces' $$(hostname -i)" ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 20
 
 volumes:
   postgres_data:

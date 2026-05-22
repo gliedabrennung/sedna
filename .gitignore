@@ -1,5 +1,12 @@
-.idea
+.idea/
+.vscode/
 .env
+
+# Compiled binaries
 server
 *.exe
-.vscode
+/messenger-server
+
+# Frontend
+frontend/node_modules/
+package-lock.json

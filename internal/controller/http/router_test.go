@@ -19,7 +19,7 @@ func newTestEngine(t *testing.T) *route.Engine {
 	})
 	engine := route.NewEngine(opts)
 
-	engine.GET("/", ServeHome)
+	engine.GET("/health", ServeHealth)
 	engine.GET("/ws", func(ctx context.Context, c *app.RequestContext) {
 		c.Status(http.StatusBadRequest)
 	})
@@ -33,10 +33,10 @@ func newTestEngine(t *testing.T) *route.Engine {
 	return engine
 }
 
-func TestSetupRouter_HomeRoute(t *testing.T) {
-	w := ut.PerformRequest(newTestEngine(t), http.MethodGet, "/", nil)
+func TestSetupRouter_HealthRoute(t *testing.T) {
+	w := ut.PerformRequest(newTestEngine(t), http.MethodGet, "/health", nil)
 	if got := w.Result().StatusCode(); got != http.StatusOK {
-		t.Errorf("GET / : expected 200, got %d", got)
+		t.Errorf("GET /health : expected 200, got %d", got)
 	}
 }
 
@@ -55,7 +55,7 @@ func TestSetupRouter_NoRoute(t *testing.T) {
 }
 
 func TestSetupRouter_NoMethod(t *testing.T) {
-	w := ut.PerformRequest(newTestEngine(t), http.MethodPost, "/", nil)
+	w := ut.PerformRequest(newTestEngine(t), http.MethodPost, "/health", nil)
 	if got := w.Result().StatusCode(); got != http.StatusMethodNotAllowed {
 		t.Errorf("wrong method: expected 405, got %d", got)
 	}

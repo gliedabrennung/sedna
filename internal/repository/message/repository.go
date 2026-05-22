@@ -14,9 +14,9 @@ type Repository struct {
 	redis  *RedisCache
 }
 
-func NewRepository(scyllaSession *gocql.Session, rdb *redis.Client) *Repository {
+func NewRepository(scyllaSession *gocql.Session, rdb *redis.Client, keyspace string) *Repository {
 	return &Repository{
-		scylla: NewScyllaStorage(scyllaSession),
+		scylla: NewScyllaStorage(scyllaSession, keyspace),
 		redis:  NewRedisCache(rdb),
 	}
 }

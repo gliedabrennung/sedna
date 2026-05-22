@@ -18,7 +18,11 @@ func setupAuthHandler(t *testing.T) (*route.Engine, *AuthHandler) {
 	t.Helper()
 	repo := testutil.NewMockUserRepo()
 	au := usecase.NewAuthUseCase(repo, "secret", time.Hour)
-	handler := NewAuthHandler(au)
+	handler := NewAuthHandler(au, CookieConfig{
+		Name:   "token",
+		MaxAge: 3600,
+		Secure: false,
+	})
 
 	engine := route.NewEngine(config.NewOptions([]config.Option{}))
 	engine.POST("/register", handler.Register)

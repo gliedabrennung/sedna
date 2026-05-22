@@ -28,7 +28,7 @@ func TestScyllaStorage_Integration(t *testing.T) {
 	}
 	defer session.Close()
 
-	storage := NewScyllaStorage(session)
+	storage := NewScyllaStorage(session, "ws")
 	chatID := "test:scylla:1"
 
 	msg1 := &entity.Message{

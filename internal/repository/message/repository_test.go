@@ -34,7 +34,7 @@ func TestRepository_Integration(t *testing.T) {
 	}
 	defer scyllaSession.Close()
 
-	repo := NewRepository(scyllaSession, redisClient)
+	repo := NewRepository(scyllaSession, redisClient, "ws")
 	chatID := "test:repo:1"
 
 	redisClient.Del(ctx, "chat:"+chatID+":cache")

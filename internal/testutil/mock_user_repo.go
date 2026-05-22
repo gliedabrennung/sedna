@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gliedabrennung/messenger-core/internal/apperr"
 	"github.com/gliedabrennung/messenger-core/internal/entity"
@@ -30,4 +31,28 @@ func (m *MockUserRepo) GetByUsername(_ context.Context, username string) (*entit
 		return nil, apperr.ErrUserNotFound
 	}
 	return user, nil
+}
+
+func (m *MockUserRepo) Search(_ context.Context, query string) ([]entity.User, error) {
+	var result []entity.User
+	for _, u := range m.Users {
+		if strings.Contains(strings.ToLower(u.Username), strings.ToLower(query)) {
+			result = append(result, *u)
+		}
+	}
+	return result, nil
+}
+
+func (m *MockUserRepo) GetByIDs(_ context.Context, ids []int64) ([]entity.User, error) {
+	idSet := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		idSet[id] = struct{}{}
+	}
+	var result []entity.User
+	for _, u := range m.Users {
+		if _, ok := idSet[u.ID]; ok {
+			result = append(result, *u)
+		}
+	}
+	return result, nil
 }

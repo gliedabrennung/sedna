@@ -10,23 +10,19 @@ import (
 	"unicode/utf8"
 
 	"github.com/gliedabrennung/messenger-core/internal/apperr"
+	"github.com/gliedabrennung/messenger-core/internal/domain"
 	"github.com/gliedabrennung/messenger-core/internal/entity"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserRepository interface {
-	Create(ctx context.Context, user *entity.User) error
-	GetByUsername(ctx context.Context, username string) (*entity.User, error)
-}
-
 type AuthUseCase struct {
-	repo      UserRepository
+	repo      domain.UserRepository
 	jwtSecret string
 	jwtTTL    time.Duration
 }
 
-func NewAuthUseCase(repo UserRepository, jwtSecret string, jwtTTL time.Duration) *AuthUseCase {
+func NewAuthUseCase(repo domain.UserRepository, jwtSecret string, jwtTTL time.Duration) *AuthUseCase {
 	return &AuthUseCase{
 		repo:      repo,
 		jwtSecret: jwtSecret,

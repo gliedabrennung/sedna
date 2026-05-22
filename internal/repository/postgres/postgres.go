@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"strconv"
+
 	"github.com/gliedabrennung/messenger-core/internal/apperr"
 	"github.com/gliedabrennung/messenger-core/internal/entity"
 	"github.com/jackc/pgx/v5"
@@ -54,4 +56,58 @@ func (repo *Repository) GetByUsername(ctx context.Context, username string) (*en
 		return nil, fmt.Errorf("postgres: get user by username: %w", err)
 	}
 	return user, nil
+}
+
+func (repo *Repository) Search(ctx context.Context, query string) ([]entity.User, error) {
+	var users []entity.User
+
+	id, err := strconv.ParseInt(query, 10, 64)
+	var q string
+	var args []interface{}
+
+	if err == nil {
+		q = `SELECT id, username, created_at, updated_at FROM users WHERE id = $1 OR username ILIKE $2 LIMIT 20`
+		args = []interface{}{id, "%" + query + "%"}
+	} else {
+		q = `SELECT id, username, created_at, updated_at FROM users WHERE username ILIKE $1 LIMIT 20`
+		args = []interface{}{"%" + query + "%"}
+	}
+
+	rows, err := repo.db.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: search users: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var u entity.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("postgres: scan user: %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+func (repo *Repository) GetByIDs(ctx context.Context, ids []int64) ([]entity.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	q := `SELECT id, username FROM users WHERE id = ANY($1)`
+	rows, err := repo.db.Query(ctx, q, ids)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: get users by ids: %w", err)
+	}
+	defer rows.Close()
+
+	var users []entity.User
+	for rows.Next() {
+		var u entity.User
+		if err := rows.Scan(&u.ID, &u.Username); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
 }

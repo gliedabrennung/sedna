@@ -7,6 +7,10 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
-func ServeHome(_ context.Context, c *app.RequestContext) {
-	c.JSON(http.StatusOK, nil)
+type healthResponse struct {
+	Status string `json:"status"`
+}
+
+func ServeHealth(_ context.Context, c *app.RequestContext) {
+	c.JSON(http.StatusOK, healthResponse{Status: "ok"})
 }

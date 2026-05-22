@@ -11,7 +11,8 @@ import (
 )
 
 type ScyllaStorage struct {
-	session *gocql.Session
+	session  *gocql.Session
+	keyspace string
 }
 
 func InitSchema(ctx context.Context, hosts []string, keyspace string) error {
@@ -51,8 +52,8 @@ func InitSchema(ctx context.Context, hosts []string, keyspace string) error {
 	return nil
 }
 
-func NewScyllaStorage(session *gocql.Session) *ScyllaStorage {
-	return &ScyllaStorage{session: session}
+func NewScyllaStorage(session *gocql.Session, keyspace string) *ScyllaStorage {
+	return &ScyllaStorage{session: session, keyspace: keyspace}
 }
 
 func (s *ScyllaStorage) Save(ctx context.Context, msg *entity.Message) error {
@@ -60,10 +61,11 @@ func (s *ScyllaStorage) Save(ctx context.Context, msg *entity.Message) error {
 	msg.MessageID = id.String()
 	msg.CreatedAt = time.Now()
 
-	err := s.session.Query(`
-		INSERT INTO ws.direct_messages
+	query := fmt.Sprintf(`
+		INSERT INTO %s.direct_messages
 		(chat_id, message_id, from_id, to_id, content, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?)`, s.keyspace)
+	err := s.session.Query(query,
 		msg.ChatID, id, msg.FromID, msg.ToID, msg.Content, msg.CreatedAt,
 	).WithContext(ctx).Exec()
 
@@ -80,12 +82,12 @@ func (s *ScyllaStorage) GetHistory(ctx context.Context, chatID string, limit int
 	var query *gocql.Query
 
 	if cursor == "" {
-		query = s.session.Query(`
+		query = s.session.Query(fmt.Sprintf(`
 			SELECT chat_id, message_id, from_id, to_id, content, created_at
-			FROM ws.direct_messages
+			FROM %s.direct_messages
 			WHERE chat_id = ?
 			ORDER BY message_id DESC
-			LIMIT ?`, chatID, limit+1,
+			LIMIT ?`, s.keyspace), chatID, limit+1,
 		).WithContext(ctx)
 	} else {
 		cursorUUID, err := gocql.ParseUUID(cursor)
@@ -93,12 +95,12 @@ func (s *ScyllaStorage) GetHistory(ctx context.Context, chatID string, limit int
 			logger.CtxErrorf(ctx, "scylla parse cursor %s failed: %v", cursor, err)
 			return nil, "", fmt.Errorf("scylla: parse cursor: %w", err)
 		}
-		query = s.session.Query(`
+		query = s.session.Query(fmt.Sprintf(`
 			SELECT chat_id, message_id, from_id, to_id, content, created_at
-			FROM ws.direct_messages
+			FROM %s.direct_messages
 			WHERE chat_id = ? AND message_id < ?
 			ORDER BY message_id DESC
-			LIMIT ?`, chatID, cursorUUID, limit+1,
+			LIMIT ?`, s.keyspace), chatID, cursorUUID, limit+1,
 		).WithContext(ctx)
 	}
 

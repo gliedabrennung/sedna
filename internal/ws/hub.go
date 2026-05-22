@@ -14,7 +14,7 @@ const shardCount = 32
 type Hub struct {
 	shards  [shardCount]*shard
 	done    chan struct{}
-	MsgRepo domain.MessageRepository
+	msgRepo domain.MessageRepository
 }
 
 type shard struct {
@@ -34,7 +34,7 @@ type DirectMessage struct {
 func NewHub(msgRepo domain.MessageRepository) *Hub {
 	h := &Hub{
 		done:    make(chan struct{}),
-		MsgRepo: msgRepo,
+		msgRepo: msgRepo,
 	}
 	for i := range h.shards {
 		h.shards[i] = &shard{
@@ -88,6 +88,10 @@ func (h *Hub) Done() <-chan struct{} {
 
 func (h *Hub) Stop() {
 	close(h.done)
+}
+
+func (h *Hub) MsgRepo() domain.MessageRepository {
+	return h.msgRepo
 }
 
 func (h *Hub) Run(ctx context.Context) {

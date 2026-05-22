@@ -3,15 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-
-	"github.com/gliedabrennung/messenger-core/internal/common/logger"
-
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/gliedabrennung/messenger-core/internal/common/logger"
 	"github.com/gliedabrennung/messenger-core/internal/config"
 	"github.com/gliedabrennung/messenger-core/internal/controller/http"
-	"github.com/gliedabrennung/messenger-core/internal/controller/http/middleware"
 	"github.com/gliedabrennung/messenger-core/internal/domain"
 	"github.com/gliedabrennung/messenger-core/internal/repository/message"
 	"github.com/gliedabrennung/messenger-core/internal/repository/postgres"
@@ -72,19 +69,19 @@ func run() error {
 		rdb = nil
 	} else {
 		defer func() {
-			err = rdb.Close()
-			if err != nil {
+			if err := rdb.Close(); err != nil {
 				logger.Warnf("warning: could not close redis connection: %v", err)
 			}
 		}()
 	}
 
 	if scyllaSession != nil && rdb != nil {
-		msgRepo = message.NewRepository(scyllaSession, rdb)
+		msgRepo = message.NewRepository(scyllaSession, rdb, cfg.ScyllaKeyspace)
 	}
 
 	repo := postgres.NewPostgresRepository(dbpool)
 	authUseCase := usecase.NewAuthUseCase(repo, cfg.JWTSecret, cfg.JWTTTL)
+	userUseCase := usecase.NewUserUseCase(repo)
 
 	hubCtx, hubCancel := context.WithCancel(ctx)
 	defer hubCancel()
@@ -104,12 +101,21 @@ func run() error {
 
 	upgrader := ws.NewUpgrader(cfg.AllowedOrigins)
 	wsHandler := ws.ServeWs(hub, upgrader)
-	authMiddleware := middleware.JWTAuth(cfg.JWTSecret)
+
+	cookieCfg := http.CookieConfig{
+		Name:   "token",
+		MaxAge: int(cfg.JWTTTL.Seconds()),
+		Secure: false,
+		Domain: "",
+	}
 
 	http.SetupRouter(h, http.Deps{
-		Auth:           authUseCase,
-		WsHandler:      wsHandler,
-		AuthMiddleware: authMiddleware,
+		Auth:      authUseCase,
+		Users:     userUseCase,
+		MsgRepo:   msgRepo,
+		WsHandler: wsHandler,
+		JWTSecret: cfg.JWTSecret,
+		Cookie:    cookieCfg,
 	})
 
 	h.Spin()

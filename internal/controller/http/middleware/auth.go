@@ -12,8 +12,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func JWTAuth(secret string) app.HandlerFunc {
+func JWTAuth(secret string, cookieNames ...string) app.HandlerFunc {
 	secretBytes := []byte(secret)
+	cookieName := "token"
+	if len(cookieNames) > 0 && cookieNames[0] != "" {
+		cookieName = cookieNames[0]
+	}
 	return func(ctx context.Context, c *app.RequestContext) {
 		var tokenStr string
 
@@ -21,6 +25,8 @@ func JWTAuth(secret string) app.HandlerFunc {
 			tokenStr = t
 		} else if q := strings.TrimSpace(c.Query("token")); q != "" {
 			tokenStr = q
+		} else if cookie := string(c.Cookie(cookieName)); cookie != "" {
+			tokenStr = cookie
 		}
 
 		if tokenStr == "" {

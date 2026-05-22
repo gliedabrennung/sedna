@@ -96,14 +96,14 @@ func (c *Client) readPump() {
 			Message: inc.Message,
 		}
 
-		if c.hub.MsgRepo != nil {
+		if c.hub.MsgRepo() != nil {
 			repoMsg := &entity.Message{
 				ChatID:  entity.MakeChatID(c.id, toID),
 				FromID:  c.id,
 				ToID:    toID,
 				Content: inc.Message,
 			}
-			if err := c.hub.MsgRepo.Save(context.Background(), repoMsg); err != nil {
+			if err := c.hub.MsgRepo().Save(context.Background(), repoMsg); err != nil {
 				logger.Errorf("ws: save message: %v", err)
 			}
 		}
