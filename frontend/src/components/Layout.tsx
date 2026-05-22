@@ -1,21 +1,19 @@
-import { useEffect, useState } from 'react';
-import { Sidebar } from './Sidebar';
-import { ChatWindow } from './ChatWindow';
-import { useAuthStore } from '../store/authStore';
+import { useEffect, useState, useRef, type FC } from 'react';
+import { Sidebar } from '@/components/Sidebar';
+import { ChatWindow } from '@/components/ChatWindow';
+import { useAuthStore } from '@/store/authStore';
 import { Navigate } from 'react-router-dom';
-import { api } from '../api';
-import type { User } from '../types';
+import { api } from '@/api';
+import { Spinner } from '@/components/ui/Spinner';
+import type { User } from '@/types';
 
-export function Layout() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+export const Layout: FC = () => {
   const user = useAuthStore((s) => s.user);
   const [isChecking, setIsChecking] = useState(true);
+  const hasVerified = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setIsChecking(false);
-      return;
-    }
+    if (hasVerified.current) return;
 
     if (!user?.id) {
       useAuthStore.getState().logout();
@@ -23,20 +21,19 @@ export function Layout() {
       return;
     }
 
+    hasVerified.current = true;
     let cancelled = false;
 
     api
-      .get<User[]>(`/users/bulk?ids=${user.id}`)
+      .get<User>(`/users/me`)
       .then((res) => {
         if (cancelled) return;
-        if (res.data?.length > 0) {
-          useAuthStore.getState().setAuth(res.data[0]);
-        } else {
-          useAuthStore.getState().logout();
+        if (res.data && res.data.id) {
+          useAuthStore.getState().setAuth(res.data);
         }
       })
       .catch(() => {
-        if (!cancelled) useAuthStore.getState().logout();
+        /* session check failed — keep current user from localStorage, don't force logout */
       })
       .finally(() => {
         if (!cancelled) setIsChecking(false);
@@ -45,37 +42,14 @@ export function Layout() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+  }, [user?.id]);
 
   if (isChecking) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <div className="flex flex-col items-center gap-3">
-          <svg
-            className="animate-spin h-8 w-8 text-indigo-500"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          <span className="text-sm font-medium text-zinc-400">Verifying session...</span>
+      <div className="flex h-screen w-screen items-center justify-center bg-[var(--color-surface-primary)]">
+        <div className="flex flex-col items-center gap-3 animate-fade-in">
+          <Spinner size="lg" />
+          <span className="text-sm font-medium text-[var(--color-text-muted)]">Verifying session...</span>
         </div>
       </div>
     );
@@ -86,9 +60,9 @@ export function Layout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-zinc-950 text-zinc-100">
+    <div className="flex h-screen overflow-hidden bg-[var(--color-surface-primary)] text-[var(--color-text-primary)]">
       <Sidebar />
       <ChatWindow />
     </div>
   );
-}
+};

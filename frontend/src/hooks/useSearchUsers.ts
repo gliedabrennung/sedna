@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { api } from '../api';
-import type { User } from '../types';
+import { api } from '@/api';
+import type { User } from '@/types';
 
 export function useSearchUsers(query: string) {
   const [results, setResults] = useState<User[]>([]);

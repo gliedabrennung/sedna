@@ -86,9 +86,6 @@ func (c *Client) readPump() {
 			continue
 		}
 
-		if toID == c.id {
-			continue
-		}
 
 		msg := DirectMessage{
 			From:    c.id,

@@ -7,7 +7,6 @@ import {
   useState,
   type ReactNode,
   type FC,
-  createElement,
 } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useChatStore } from '@/store/chatStore';
@@ -34,7 +33,6 @@ export const WebSocketProvider: FC<{ children: ReactNode }> = ({ children }) => 
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   const mountedRef = useRef(true);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
 
   useEffect(() => {
@@ -46,10 +44,6 @@ export const WebSocketProvider: FC<{ children: ReactNode }> = ({ children }) => 
 
     const connect = () => {
       if (!mountedRef.current) return;
-      if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
-        return;
-      }
-
       setStatus('connecting');
 
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -57,7 +51,6 @@ export const WebSocketProvider: FC<{ children: ReactNode }> = ({ children }) => 
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (!mountedRef.current) { ws.close(); return; }
         retriesRef.current = 0;
         setStatus('connected');
       };
@@ -88,25 +81,18 @@ export const WebSocketProvider: FC<{ children: ReactNode }> = ({ children }) => 
         setStatus('disconnected');
         const delay = Math.min(BASE_DELAY * 2 ** retriesRef.current, MAX_RECONNECT_DELAY);
         retriesRef.current++;
-        reconnectTimerRef.current = setTimeout(connect, delay);
+        setTimeout(connect, delay);
       };
 
-      ws.onerror = () => {
-        /* onclose will fire after onerror, no need to close manually */
-      };
+      ws.onerror = () => ws.close();
     };
 
     connect();
 
     return () => {
       mountedRef.current = false;
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
       if (wsRef.current) {
         wsRef.current.onclose = null;
-        wsRef.current.onerror = null;
         wsRef.current.close();
         wsRef.current = null;
       }
@@ -120,5 +106,9 @@ export const WebSocketProvider: FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
-  return createElement(WebSocketContext.Provider, { value: { sendMessage, status } }, children);
+  return (
+    <WebSocketContext.Provider value={{ sendMessage, status }}>
+      {children}
+    </WebSocketContext.Provider>
+  );
 };

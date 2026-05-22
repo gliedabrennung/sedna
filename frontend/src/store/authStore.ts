@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import type { User } from '../types';
+import type { User } from '@/types';
+
+const STORAGE_KEY = 'messenger_user';
 
 interface AuthState {
   user: User | null;
@@ -8,24 +10,24 @@ interface AuthState {
   logout: () => void;
 }
 
-const getInitialUser = (): User | null => {
+function loadUser(): User | null {
   try {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
-};
+}
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: getInitialUser(),
-  isAuthenticated: !!getInitialUser(),
+  user: loadUser(),
+  isAuthenticated: !!loadUser(),
   setAuth: (user) => {
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     set({ user, isAuthenticated: true });
   },
   logout: () => {
-    localStorage.removeItem('user');
+    localStorage.removeItem(STORAGE_KEY);
     set({ user: null, isAuthenticated: false });
   },
 }));

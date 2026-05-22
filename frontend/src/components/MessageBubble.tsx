@@ -1,6 +1,6 @@
 import { memo, useMemo, type FC } from 'react';
 import clsx from 'clsx';
-import type { Message } from '../types';
+import type { Message } from '@/types';
 
 interface MessageBubbleProps {
   message: Message;
@@ -28,22 +28,24 @@ const MessageBubbleBase: FC<MessageBubbleProps> = ({ message, isMe }) => {
   }, [message.created_at]);
 
   return (
-    <div className={clsx('flex', isMe ? 'justify-end' : 'justify-start')}>
+    <div className={clsx('flex animate-fade-in', isMe ? 'justify-end' : 'justify-start')}>
       <div
         className={clsx(
-          'max-w-[70%] rounded-2xl px-4 py-2 shadow-sm',
-          isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-zinc-800 text-zinc-100 rounded-bl-none',
-          message.isPending && 'opacity-70'
+          'max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm transition-opacity duration-200',
+          isMe
+            ? 'gradient-accent text-white rounded-br-sm'
+            : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-primary)] rounded-bl-sm border border-[var(--color-border-subtle)]',
+          message.isPending && 'opacity-60'
         )}
       >
-        <p className="text-sm break-words whitespace-pre-wrap">{content}</p>
+        <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">{content}</p>
         <div
           className={clsx(
             'text-[10px] mt-1 text-right select-none',
-            isMe ? 'text-indigo-200' : 'text-zinc-500'
+            isMe ? 'text-indigo-200/70' : 'text-[var(--color-text-muted)]'
           )}
         >
-          {formattedTime}
+          {message.isPending ? 'Sending...' : formattedTime}
         </div>
       </div>
     </div>

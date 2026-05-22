@@ -3,6 +3,8 @@ package http
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -21,38 +23,16 @@ type Deps struct {
 	Cookie    CookieConfig
 }
 
+const distDir = "./frontend/dist"
+
 func SetupRouter(h *server.Hertz, deps Deps) {
 	h.Use(api.CustomErrorHandler())
-
-	h.NoRoute(func(ctx context.Context, c *app.RequestContext) {
-		path := string(c.Request.Path())
-		if !strings.HasPrefix(path, "/auth") &&
-			!strings.HasPrefix(path, "/users") &&
-			!strings.HasPrefix(path, "/messages") &&
-			!strings.HasPrefix(path, "/ws") &&
-			!strings.HasPrefix(path, "/health") {
-			c.File("./frontend/dist/index.html")
-			return
-		}
-		api.ErrorResponse(c, http.StatusNotFound,
-			"NOT_FOUND",
-			"Page not found",
-			nil)
-	})
-
-	h.NoMethod(func(ctx context.Context, c *app.RequestContext) {
-		api.ErrorResponse(c, http.StatusMethodNotAllowed,
-			"METHOD_NOT_ALLOWED",
-			"Method not allowed",
-			nil)
-	})
 
 	authHandler := NewAuthHandler(deps.Auth, deps.Cookie)
 	userHandler := NewUserHandler(deps.Users)
 	authLimiter := middleware.NewRateLimiter(5, 10)
 	authMiddleware := middleware.JWTAuth(deps.JWTSecret, deps.Cookie.Name)
 
-	h.GET("/health", ServeHealth)
 
 	auth := h.Group("/auth")
 	auth.Use(authLimiter.Handler())
@@ -63,29 +43,49 @@ func SetupRouter(h *server.Hertz, deps Deps) {
 	users := h.Group("/users", authMiddleware)
 	users.GET("/search", userHandler.Search)
 	users.GET("/bulk", userHandler.GetBulk)
+	users.GET("/me", userHandler.Me)
 
 	msgHandler := NewMessageHandler(deps.MsgRepo)
 	h.GET("/messages", authMiddleware, msgHandler.GetHistory)
 
 	h.GET("/ws", authMiddleware, deps.WsHandler)
 
-	h.StaticFS("/", &app.FS{
-		Root:       "./frontend/dist",
-		IndexNames: []string{"index.html"},
-		PathNotFound: func(ctx context.Context, c *app.RequestContext) {
-			path := string(c.Request.Path())
-			if strings.HasPrefix(path, "/auth") ||
-				strings.HasPrefix(path, "/users") ||
-				strings.HasPrefix(path, "/messages") ||
-				strings.HasPrefix(path, "/ws") ||
-				strings.HasPrefix(path, "/health") {
-				c.JSON(http.StatusNotFound, map[string]interface{}{
-					"error_code": "NOT_FOUND",
-					"message":    "Page not found",
-				})
-				return
-			}
-			c.File("./frontend/dist/index.html")
-		},
+	h.GET("/assets/*filepath", func(ctx context.Context, c *app.RequestContext) {
+		c.File(filepath.Join(distDir, string(c.Request.Path())))
 	})
+	h.GET("/favicon.svg", func(ctx context.Context, c *app.RequestContext) {
+		c.File(filepath.Join(distDir, "favicon.svg"))
+	})
+
+	h.NoRoute(serveSPA)
+	h.NoMethod(func(ctx context.Context, c *app.RequestContext) {
+		api.ErrorResponse(c, http.StatusMethodNotAllowed,
+			"METHOD_NOT_ALLOWED",
+			"Method not allowed",
+			nil)
+	})
+}
+
+func serveSPA(_ context.Context, c *app.RequestContext) {
+	path := string(c.Request.Path())
+
+	if strings.HasPrefix(path, "/auth") ||
+		strings.HasPrefix(path, "/users") ||
+		strings.HasPrefix(path, "/messages") ||
+		strings.HasPrefix(path, "/ws") ||
+		strings.HasPrefix(path, "/health") {
+		api.ErrorResponse(c, http.StatusNotFound,
+			"NOT_FOUND",
+			"Page not found",
+			nil)
+		return
+	}
+
+	tryPath := filepath.Join(distDir, path)
+	if info, err := os.Stat(tryPath); err == nil && !info.IsDir() {
+		c.File(tryPath)
+		return
+	}
+
+	c.File(filepath.Join(distDir, "index.html"))
 }

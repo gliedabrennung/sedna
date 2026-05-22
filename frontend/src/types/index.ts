@@ -17,3 +17,5 @@ export interface ChatHistoryResponse {
   messages: Message[];
   next_cursor: string | null;
 }
+
+export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';

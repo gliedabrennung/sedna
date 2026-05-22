@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useCallback, type FC, type FormEvent } from 'react';
-import { Send, UserCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, type FC, type SyntheticEvent } from 'react';
+import { Send, MessageSquare } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useAuthStore } from '../store/authStore';
-import { useChatStore } from '../store/chatStore';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { useChatMessages } from '../hooks/useChatMessages';
-import { MessageBubble } from './MessageBubble';
-import { Avatar } from './ui/Avatar';
-import { Input } from './ui/Input';
+import { useAuthStore } from '@/store/authStore';
+import { useChatStore } from '@/store/chatStore';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useChatMessages } from '@/hooks/useChatMessages';
+import { MessageBubble } from '@/components/MessageBubble';
+import { Avatar } from '@/components/ui/Avatar';
+import { Input } from '@/components/ui/Input';
 
 export const ChatWindow: FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -20,6 +20,8 @@ export const ChatWindow: FC = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollHeightRef = useRef<number>(0);
+  const prevPartnerIdRef = useRef<number | undefined>(undefined);
+  const prevMessagesLenRef = useRef<number>(0);
 
   const rowVirtualizer = useVirtualizer({
     count: messages.length,
@@ -37,10 +39,20 @@ export const ChatWindow: FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    if (messages.length > 0 && scrollHeightRef.current === 0) {
+    const partnerChanged = prevPartnerIdRef.current !== activePartner?.id;
+    const isNewMessage = messages.length > prevMessagesLenRef.current && !partnerChanged;
+
+    if (partnerChanged && messages.length > 0) {
+      setTimeout(() => {
+        rowVirtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
+      }, 100);
+    } else if (isNewMessage) {
       rowVirtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
     }
-  }, [messages.length, rowVirtualizer]);
+
+    prevPartnerIdRef.current = activePartner?.id;
+    prevMessagesLenRef.current = messages.length;
+  }, [messages.length, activePartner?.id, rowVirtualizer]);
 
   const handleScroll = useCallback(() => {
     if (containerRef.current && containerRef.current.scrollTop === 0 && hasMore && !isLoading) {
@@ -50,36 +62,37 @@ export const ChatWindow: FC = () => {
   }, [hasMore, isLoading, loadMore]);
 
   const handleSend = useCallback(
-    (e: FormEvent) => {
+    (e: SyntheticEvent) => {
       e.preventDefault();
       if (!text.trim() || !activePartner || !user) return;
 
       sendMessage(activePartner.id, text.trim());
 
       addMessage(activePartner.id, {
-        message_id: `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        message_id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         from_id: user.id,
         to_id: activePartner.id,
         content: text.trim(),
         created_at: new Date().toISOString(),
-        isPending: true,
       });
 
       setText('');
-      setTimeout(() => {
-        rowVirtualizer.scrollToIndex(messages.length, { align: 'end' });
-      }, 50);
     },
-    [text, activePartner, user, sendMessage, addMessage, messages.length, rowVirtualizer]
+    [text, activePartner, user, sendMessage, addMessage]
   );
 
   if (!activePartner) {
     return (
-      <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center text-zinc-500 select-none">
-        <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mb-4 border border-zinc-800">
-          <UserCircle size={32} />
+      <div className="flex-1 bg-[var(--color-surface-primary)] flex flex-col items-center justify-center select-none animate-fade-in">
+        <div className="w-20 h-20 rounded-full gradient-surface flex items-center justify-center mb-5 border border-[var(--color-border-primary)] shadow-lg">
+          <MessageSquare size={32} className="text-[var(--color-accent-start)]" />
         </div>
-        <p className="text-sm">Select a chat to start messaging</p>
+        <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-1">
+          Welcome to Messenger
+        </h3>
+        <p className="text-sm text-[var(--color-text-muted)]">
+          Select a conversation to start messaging
+        </p>
       </div>
     );
   }
@@ -87,22 +100,22 @@ export const ChatWindow: FC = () => {
   const virtualItems = rowVirtualizer.getVirtualItems();
 
   return (
-    <div className="flex-1 flex flex-col bg-zinc-950 h-screen">
-      <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex items-center gap-3">
+    <div className="flex-1 flex flex-col bg-[var(--color-surface-primary)] h-screen">
+      <div className="p-4 border-b border-[var(--color-border-primary)] glass flex items-center gap-3">
         <Avatar username={activePartner.username} />
         <div>
-          <div className="font-medium text-zinc-100">{activePartner.username}</div>
-          <div className="text-xs text-zinc-500">User ID: {activePartner.id}</div>
+          <div className="font-semibold text-[var(--color-text-primary)]">{activePartner.username}</div>
+          <div className="text-xs text-[var(--color-text-muted)]">ID: {activePartner.id}</div>
         </div>
       </div>
 
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 scroll-smooth"
+        className="flex-1 overflow-y-auto p-4"
       >
         {isLoading && (
-          <div className="text-center text-xs text-zinc-500 py-2">
+          <div className="text-center text-xs text-[var(--color-text-muted)] py-2 animate-pulse-soft">
             Loading messages...
           </div>
         )}
@@ -140,19 +153,21 @@ export const ChatWindow: FC = () => {
         </div>
       </div>
 
-      <div className="p-4 bg-zinc-900 border-t border-zinc-800">
-        <form onSubmit={handleSend} className="flex gap-2">
+      <div className="p-4 glass border-t border-[var(--color-border-primary)]">
+        <form id="message-form" onSubmit={handleSend} className="flex gap-2">
           <Input
+            id="message-input"
             type="text"
             placeholder="Write a message..."
-            className="flex-1 bg-zinc-950 border border-zinc-800 rounded-full px-5 py-2.5 text-sm"
+            className="flex-1 !bg-[var(--color-surface-primary)] !border-[var(--color-border-primary)] !rounded-[var(--radius-full)] !px-5 !py-2.5 !text-sm"
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
           <button
+            id="send-button"
             type="submit"
             disabled={!text.trim()}
-            className="p-3 bg-indigo-600 text-white rounded-full hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 flex items-center justify-center"
+            className="p-3 gradient-accent text-white rounded-full hover:opacity-90 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95"
           >
             <Send size={18} />
           </button>

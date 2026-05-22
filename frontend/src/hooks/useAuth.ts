@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { api } from '../api';
-import { useAuthStore } from '../store/authStore';
+import { api } from '@/api';
+import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 
 export function useAuth() {

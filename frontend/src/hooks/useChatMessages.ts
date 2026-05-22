@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { api } from '../api';
-import { useChatStore } from '../store/chatStore';
-import type { ChatHistoryResponse } from '../types';
+import { api } from '@/api';
+import { useChatStore } from '@/store/chatStore';
+import type { ChatHistoryResponse, Message } from '@/types';
+
+const EMPTY_MESSAGES: Message[] = [];
 
 export function useChatMessages(partnerId: number | undefined) {
   const setMessages = useChatStore((s) => s.setMessages);
-  const messages = useChatStore((s) => (partnerId ? s.messages[partnerId] || [] : []));
+  const messages = useChatStore((s) => (partnerId ? s.messages[partnerId] || EMPTY_MESSAGES : EMPTY_MESSAGES));
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const cursorRef = useRef<string | null>(null);

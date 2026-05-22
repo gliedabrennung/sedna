@@ -7,30 +7,34 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const InputBase: ForwardRefRenderFunction<HTMLInputElement, InputProps> = (
-  { label, error, className, ...props },
+  { label, error, className, id, ...props },
   ref
 ) => {
+  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-zinc-400 mb-1">
+        <label
+          htmlFor={inputId}
+          className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5"
+        >
           {label}
         </label>
       )}
       <input
         ref={ref}
+        id={inputId}
         className={clsx(
-          'w-full px-4 py-2 bg-zinc-950 border rounded-lg text-zinc-100 placeholder-zinc-600',
-          'focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors',
-          error ? 'border-red-500/50 focus:ring-red-500' : 'border-zinc-800',
+          'w-full px-4 py-2.5 bg-[var(--color-surface-primary)] border rounded-[var(--radius-md)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)]',
+          'focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-start)]/30 focus:border-[var(--color-accent-start)] transition-all duration-200',
+          error ? 'border-[var(--color-danger)]/50 focus:ring-[var(--color-danger)]/30' : 'border-[var(--color-border-primary)]',
           className
         )}
         {...props}
       />
       {error && (
-        <span className="text-xs text-red-400 mt-1 block">
-          {error}
-        </span>
+        <span className="text-xs text-[var(--color-danger)] mt-1.5 block">{error}</span>
       )}
     </div>
   );
