@@ -4,7 +4,8 @@
 
 ## 🛠 Стек технологий
 * **Язык**: Go 1.26
-* **Web/API**: Hertz, WebSocket
+* **Backend**: Hertz
+* **Frontend**: React
 * **Базы данных**: PostgreSQL (пользователи), ScyllaDB (история сообщений)
 * **Кэш & Pub/Sub**: Redis
 * **Инфраструктура**: Docker, Docker Compose
