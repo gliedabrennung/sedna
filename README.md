@@ -23,7 +23,7 @@
    ```
 3. Запуск тестов:
    ```bash
-   docker run --rm -v "${PWD}:/app" -w /app golang:1.26 go test -v ./...
+   go test ./..
    ```
 
 ## 📡 Примеры запросов
