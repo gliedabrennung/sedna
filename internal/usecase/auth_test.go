@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gliedabrennung/messenger-core/internal/apperr"
-	"github.com/gliedabrennung/messenger-core/internal/testutil"
+	"github.com/gliedabrennung/sedna/internal/apperr"
+	"github.com/gliedabrennung/sedna/internal/testutil"
 )
 
 func TestAuthUseCase_Register(t *testing.T) {

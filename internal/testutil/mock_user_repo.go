@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gliedabrennung/messenger-core/internal/apperr"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/apperr"
+	"github.com/gliedabrennung/sedna/internal/entity"
 )
 
 type MockUserRepo struct {

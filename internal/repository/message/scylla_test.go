@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/entity"
 	"github.com/gocql/gocql"
 )
 

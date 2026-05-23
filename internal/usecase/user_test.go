@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gliedabrennung/messenger-core/internal/testutil"
+	"github.com/gliedabrennung/sedna/internal/testutil"
 )
 
 func TestUserUseCase_SearchUsers(t *testing.T) {

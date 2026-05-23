@@ -1,47 +1,68 @@
-# Messenger Core
+# Sedna
 
-A Go-based messenger backend service utilizing Hertz, Postgres, ScyllaDB, and Redis.
+Высоконагруженный бэкенд мессенджера реального времени.
 
----
+## 🛠 Стек технологий
+* **Язык**: Go 1.26
+* **Web/API**: Hertz, WebSocket
+* **Базы данных**: PostgreSQL (пользователи), ScyllaDB (история сообщений)
+* **Кэш & Pub/Sub**: Redis
+* **Инфраструктура**: Docker, Docker Compose
 
-## 📂 Project Structure
+## 🚀 Запуск проекта
 
-Here is a breakdown of the core directories and their responsibilities:
+Убедитесь, что у вас установлены **Go 1.26+** и **Docker**.
 
-* **`cmd/`**
-  * `server/` — Entry point for the main HTTP & WebSocket application server.
-  * `test_ws/` — A WebSocket client tool for testing real-time messaging.
-* **`internal/`**
-  * `config/` — Configuration loader and environment variable bindings.
-  * `controller/` — REST API controllers, router definitions, and middleware (e.g., JWT Authentication).
-  * `domain/` — Core business logic interfaces and system abstractions.
-  * `entity/` — Domain data models.
-  * `messenger/` — WebSocket client, hub, and connection upgrade handlers.
-  * `pkg/` — Reusable packages and system-wide utilities (e.g., Zap logging).
-  * `repository/` — Database access layer (PostgreSQL for user data, ScyllaDB/Redis for messaging and caching).
-  * `usecase/` — Application orchestration layer coordinating business rules.
-* **`migrations/`**
-  * SQL and CQL schema migrations for PostgreSQL and ScyllaDB.
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Make sure you have the following installed on your machine:
-* **Go** (v1.26+)
-* **Docker** & **Docker Compose**
-
-### Running the Project
-
-1. **Spin up dependencies:**
+1. Запустите инфраструктуру (БД и Redis):
    ```bash
    docker-compose up -d
    ```
-   *This starts PostgreSQL (`db`), Redis, and ScyllaDB.*
-
-2. **Run the application server:**
+2. Запустите сервер:
    ```bash
    go run cmd/server/main.go
    ```
+3. Запуск тестов:
+   ```bash
+   docker run --rm -v "${PWD}:/app" -w /app golang:1.26 go test -v ./...
+   ```
+
+## 📡 Примеры запросов
+
+### 1. Авторизация (REST)
+**Запрос:** `POST /api/v1/auth/login`
+```json
+{
+  "username": "johndoe",
+  "password": "secretpassword"
+}
+```
+**Ответ:** `200 OK` (возвращает JWT токен)
+
+### 2. Получение истории чата (REST)
+**Запрос:** `GET /api/v1/messages/history?partner_id=2`
+*(Не забудьте передать куку `token` или заголовок `Authorization: Bearer <token>`)*
+**Ответ:** `200 OK`
+```json
+{
+  "messages": [
+    {
+      "message_id": "uuid-v4",
+      "content": "Привет!",
+      "from_id": 1,
+      "to_id": 2,
+      "created_at": "2026-05-22T20:00:00Z"
+    }
+  ],
+  "next_cursor": ""
+}
+```
+
+### 3. Отправка сообщения (WebSocket)
+**Подключение:** `ws://localhost:8080/ws`
+**Payload (JSON):**
+```json
+{
+  "to": 2,
+  "message": "Привет! Как дела?"
+}
+```

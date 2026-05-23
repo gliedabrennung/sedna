@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/gliedabrennung/messenger-core/internal/common/logger"
-	"github.com/gliedabrennung/messenger-core/internal/domain"
+	"github.com/gliedabrennung/sedna/internal/common/logger"
+	"github.com/gliedabrennung/sedna/internal/domain"
 )
 
 const shardCount = 32

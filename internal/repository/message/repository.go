@@ -3,8 +3,8 @@ package message
 import (
 	"context"
 
-	"github.com/gliedabrennung/messenger-core/internal/common/logger"
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/common/logger"
+	"github.com/gliedabrennung/sedna/internal/entity"
 	"github.com/gocql/gocql"
 	"github.com/redis/go-redis/v9"
 )

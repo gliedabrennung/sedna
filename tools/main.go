@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gliedabrennung/messenger-core/internal/common/logger"
+	"github.com/gliedabrennung/sedna/internal/common/logger"
 
 	"github.com/gorilla/websocket"
 )

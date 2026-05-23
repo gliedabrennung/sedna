@@ -1,4 +1,4 @@
-module github.com/gliedabrennung/messenger-core
+module github.com/gliedabrennung/sedna
 
 go 1.26.1
 

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/gliedabrennung/messenger-core/internal/common/api"
+	"github.com/gliedabrennung/sedna/internal/common/api"
 )
 
 type visitor struct {

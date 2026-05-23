@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gliedabrennung/messenger-core/internal/entity"
+	"github.com/gliedabrennung/sedna/internal/entity"
 	"github.com/redis/go-redis/v9"
 )
 
